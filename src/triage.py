@@ -80,7 +80,8 @@ def load_pipeline_for_task(task: str, config: Dict[str, Any] = None) -> Tuple[An
 
 def validate_csv_input(
     input_source: Union[bytes, str, io.StringIO, io.BytesIO, Any],
-    expected_features: List[str]
+    expected_features: List[str],
+    auto_drop_labels: bool = False
 ) -> pd.DataFrame:
     """Kiểm tra và chuẩn hóa bảng dữ liệu đầu vào theo đúng 55 features của model.
 
@@ -110,7 +111,7 @@ def validate_csv_input(
             text = str(content)
     elif isinstance(input_source, pd.DataFrame):
         # Trực tiếp xử lý dataframe
-        return _validate_dataframe(input_source, expected_features)
+        return _validate_dataframe(input_source, expected_features, auto_drop_labels=auto_drop_labels)
     else:
         raise ValueError("Định dạng dữ liệu đầu vào không được hỗ trợ.")
 
@@ -145,10 +146,14 @@ def validate_csv_input(
     if len(df) == 0:
         raise ValueError("Bảng dữ liệu rỗng: CSV có header nhưng không chứa dòng dữ liệu nào.")
 
-    return _validate_dataframe(df, expected_features)
+    return _validate_dataframe(df, expected_features, auto_drop_labels=auto_drop_labels)
 
 
-def _validate_dataframe(df: pd.DataFrame, expected_features: List[str]) -> pd.DataFrame:
+def _validate_dataframe(
+    df: pd.DataFrame,
+    expected_features: List[str],
+    auto_drop_labels: bool = False
+) -> pd.DataFrame:
     """Kiểm tra schema và giá trị của DataFrame."""
     cols = list(df.columns)
 
@@ -157,6 +162,14 @@ def _validate_dataframe(df: pd.DataFrame, expected_features: List[str]) -> pd.Da
     duplicates = [col for col, count in col_counts.items() if count > 1]
     if duplicates:
         raise ValueError(f"Dữ liệu chứa cột trùng lặp: {duplicates}")
+
+    # Tự động loại bỏ các cột nhãn Ground-Truth / Metadata đã biết nếu được bật
+    KNOWN_LABEL_COLS = {"Class", "Category", "Filename", "row_index", "group_id"}
+    if auto_drop_labels:
+        label_extras = [c for c in cols if c in KNOWN_LABEL_COLS and c not in expected_features]
+        if label_extras:
+            df = df.drop(columns=label_extras)
+            cols = list(df.columns)
 
     missing = [c for c in expected_features if c not in cols]
     extra = [c for c in cols if c not in expected_features]

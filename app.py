@@ -438,9 +438,15 @@ def main():
     """)
 
     uploaded_file = st.file_uploader(
-        "Tải lên tệp CSV chứa đúng 55 đặc trưng bộ nhớ từ Volatility (loại trừ các cột nhãn Class / Category)",
+        "Tải lên tệp CSV chứa các đặc trưng bộ nhớ từ Volatility (55 features hoặc file gốc Obfuscated-MalMem2022.csv)",
         type=["csv"],
-        help="Hợp đồng schema: đúng 55 features số. Bảng rỗng, thiếu, dư, trùng cột hoặc chữ rác/infinity sẽ bị từ chối."
+        help="Hệ thống hỗ trợ cả file 55 features thuần túy lẫn file gốc chứa các cột nhãn Ground-Truth (Class, Category)."
+    )
+
+    auto_drop_labels = st.checkbox(
+        "🛡️ Tự động nhận diện và lọc bỏ cột nhãn Ground-Truth (Class, Category) nếu phát hiện trong file tải lên",
+        value=True,
+        help="Bật tùy chọn này để nạp thẳng file gốc Obfuscated-MalMem2022.csv. Hệ thống sẽ tự động tách 2 cột nhãn Class và Category để trích xuất đúng 55 đặc trưng nạp vào pipeline."
     )
 
     input_data = None
@@ -466,14 +472,14 @@ def main():
     # Xác thực dữ liệu
     expected_features = list(pipeline.feature_names_in_)
     try:
-        X_validated = validate_csv_input(input_data, expected_features)
+        X_validated = validate_csv_input(input_data, expected_features, auto_drop_labels=auto_drop_labels)
     except ValueError as ve:
         st.error(f"🚨 **[DATA CONTRACT VIOLATION] Xác thực thất bại:** {ve}")
         st.markdown("""
         > [!IMPORTANT]
         > **Quy chuẩn hợp đồng dữ liệu Volatility (55 features):**
         > - Đúng 55 đặc trưng số đã trích xuất từ RAM dump.
-        > - Tuyệt đối không chứa cột nhãn (`Class`, `Category`, `Filename`, `row_index`, `group_id`).
+        > - Tuyệt đối không chứa cột nhãn (`Class`, `Category`, `Filename`, `row_index`, `group_id`) trừ khi bật tùy chọn tự động lọc bỏ.
         > - Không có cột trùng lặp, chữ rác không phải số, hoặc giá trị vô cực (`inf`).
         > - Cho phép cột đảo thứ tự (hệ thống sẽ tự động reorder theo đúng pipeline).
         """)
@@ -482,7 +488,7 @@ def main():
         st.error(f"🚨 **[UNEXPECTED_ERROR] Lỗi đọc dữ liệu:** {ex}")
         return
 
-    st.success(f"✅ [INTEGRITY_OK] Xác thực hợp lệ! Đã nhận diện **{len(X_validated)} mẫu bộ nhớ** với đủ 55 features theo thứ tự pipeline.")
+    st.success(f"✅ [INTEGRITY_OK] Xác thực hợp lệ! Đã nhận diện **{len(X_validated):,} mẫu bộ nhớ** với đủ 55 features theo thứ tự pipeline.")
 
     # ---------------------------------------------------- 2. Batch Inference
     st.html(f"""
@@ -587,11 +593,29 @@ def main():
     </div>
     """)
 
-    selected_row_idx = st.selectbox(
-        "Chọn mẫu dòng bộ nhớ để điều tra chi tiết:",
-        options=list(range(len(X_validated))),
-        format_func=lambda i: f"Mẫu #{i} ➜ Kết quả: [{results_df.loc[i, 'Kết quả']}] | p_max = {results_df.loc[i, 'p_max']:.6f} | Lớp ứng viên: {results_df.loc[i, 'Lớp ứng viên']}"
-    )
+    if len(X_validated) > 500:
+        col_sel1, col_sel2 = st.columns([1.2, 2])
+        with col_sel1:
+            selected_row_idx = st.number_input(
+                f"Nhập số dòng mẫu (0 đến {len(X_validated)-1:,}) để điều tra chi tiết:",
+                min_value=0,
+                max_value=len(X_validated)-1,
+                value=0,
+                step=1,
+                help=f"Tệp lớn ({len(X_validated):,} dòng). Nhập số dòng bất kỳ để nhảy nhanh tới mẫu đó."
+            )
+        with col_sel2:
+            st.html(f"""
+            <div style="margin-top: 24px; padding: 10px 14px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.88rem; color: #0369a1;">
+                Mẫu <b>#{selected_row_idx}</b> ➜ Kết quả: <b>[{results_df.loc[selected_row_idx, 'Kết quả']}]</b> | p_max = <b>{results_df.loc[selected_row_idx, 'p_max']:.6f}</b> | Lớp ứng viên: <b>{results_df.loc[selected_row_idx, 'Lớp ứng viên']}</b>
+            </div>
+            """)
+    else:
+        selected_row_idx = st.selectbox(
+            "Chọn mẫu dòng bộ nhớ để điều tra chi tiết:",
+            options=list(range(len(X_validated))),
+            format_func=lambda i: f"Mẫu #{i} ➜ Kết quả: [{results_df.loc[i, 'Kết quả']}] | p_max = {results_df.loc[i, 'p_max']:.6f} | Lớp ứng viên: {results_df.loc[i, 'Lớp ứng viên']}"
+        )
 
     row_data = X_validated.iloc[[selected_row_idx]]
     row_result = results_df.iloc[selected_row_idx]
