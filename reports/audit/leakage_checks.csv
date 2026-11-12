@@ -1,0 +1,9 @@
+check,value
+malware_families_and_benign,16
+best_single_feature,svcscan.nservices
+best_single_feature_accuracy,0.99684
+single_feature_fit_split,train
+single_feature_score_split,validation
+feature_groups_in_many_splits,0
+sample_tokens_in_many_splits,0
+families_present_in_all_splits,16

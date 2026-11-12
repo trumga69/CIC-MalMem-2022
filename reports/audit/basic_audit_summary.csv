@@ -1,0 +1,12 @@
+check,value
+rows,58596
+features,55
+missing_cells,0
+infinite_cells,0
+constant_features,3
+invalid_category_rows,0
+binary_label_mismatch_rows,0
+duplicate_feature_rows,569
+rows_in_duplicate_groups,1086
+binary_conflict_groups,0
+multiclass_conflict_groups,9

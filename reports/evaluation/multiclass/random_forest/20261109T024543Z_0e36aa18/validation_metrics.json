@@ -1,0 +1,318 @@
+{
+  "algorithm": "random_forest",
+  "params": {
+    "bootstrap": true,
+    "ccp_alpha": 0.0,
+    "class_weight": null,
+    "criterion": "gini",
+    "max_depth": null,
+    "max_features": "sqrt",
+    "max_leaf_nodes": null,
+    "max_samples": null,
+    "min_impurity_decrease": 0.0,
+    "min_samples_leaf": 1,
+    "min_samples_split": 2,
+    "min_weight_fraction_leaf": 0.0,
+    "monotonic_cst": null,
+    "n_estimators": 100,
+    "n_jobs": 2,
+    "oob_score": false,
+    "random_state": 42,
+    "verbose": 0,
+    "warm_start": false
+  },
+  "protocol": {
+    "task": "multiclass",
+    "labels": [
+      "Benign",
+      "Ransomware",
+      "Spyware",
+      "Trojan"
+    ],
+    "seed": 42,
+    "split_sha256": "88da6b733625a289fe244fb6018c85cbbb4034f1e8ef45d79dadf0cbd15797b6",
+    "primary_metric": "validation_macro_f1",
+    "tie_break": [
+      "validation_macro_recall_desc",
+      "model_bytes_asc",
+      "algorithm_name_asc"
+    ],
+    "tuning_budget": "one fixed baseline configuration per algorithm; no tuning in these notebooks",
+    "tau_grid": [
+      0.0,
+      0.5,
+      0.6,
+      0.65,
+      0.7,
+      0.8,
+      0.9,
+      0.95,
+      0.99,
+      1.0
+    ],
+    "selected_model": null,
+    "selected_tau": null,
+    "test_evaluation": "excluded; requires a separate frozen final decision",
+    "caveats": [
+      "token grouping is not verified specimen identity",
+      "benign host/session metadata unavailable",
+      "near duplicates and collection artifacts not ruled out",
+      "local CSV has 55 numeric features rather than PDF description of 56",
+      "no byte-identity verification against UNB master"
+    ],
+    "models": {
+      "random_forest": {
+        "n_estimators": 100,
+        "random_state": 42,
+        "n_jobs": 2
+      },
+      "lightgbm": {
+        "n_estimators": 100,
+        "learning_rate": 0.1,
+        "num_leaves": 31,
+        "random_state": 42,
+        "n_jobs": 2,
+        "deterministic": true,
+        "force_col_wise": true,
+        "verbosity": -1
+      }
+    }
+  },
+  "protocol_sha256": "8564db6c1ff5b562d53643013c23c51595d66ee4ff1611002698ffe60c004e1a",
+  "raw_sha256": "df27cc6d4ffef0388c6114d459e7ce5c9a099ecf7ae6606d06eaa4093980bcf3",
+  "split_sha256": "88da6b733625a289fe244fb6018c85cbbb4034f1e8ef45d79dadf0cbd15797b6",
+  "preprocessing_sha256": "50db26dd3c868dd8be786cb0d2d33e640ee678de6c3e1a33f8f90988afb4dc90",
+  "notebook_sha256_at_start": "e7d6b7efe631ccacaad3bbdc00faeb66b0835b90383e21a2a0eea7988e7292cc",
+  "status": "completed",
+  "run_id": "20261109T024543Z_0e36aa18",
+  "rows": {
+    "train": 35156,
+    "validation": 11720
+  },
+  "classes": [
+    "Benign",
+    "Ransomware",
+    "Spyware",
+    "Trojan"
+  ],
+  "features": [
+    "pslist.nproc",
+    "pslist.nppid",
+    "pslist.avg_threads",
+    "pslist.nprocs64bit",
+    "pslist.avg_handlers",
+    "dlllist.ndlls",
+    "dlllist.avg_dlls_per_proc",
+    "handles.nhandles",
+    "handles.avg_handles_per_proc",
+    "handles.nport",
+    "handles.nfile",
+    "handles.nevent",
+    "handles.ndesktop",
+    "handles.nkey",
+    "handles.nthread",
+    "handles.ndirectory",
+    "handles.nsemaphore",
+    "handles.ntimer",
+    "handles.nsection",
+    "handles.nmutant",
+    "ldrmodules.not_in_load",
+    "ldrmodules.not_in_init",
+    "ldrmodules.not_in_mem",
+    "ldrmodules.not_in_load_avg",
+    "ldrmodules.not_in_init_avg",
+    "ldrmodules.not_in_mem_avg",
+    "malfind.ninjections",
+    "malfind.commitCharge",
+    "malfind.protection",
+    "malfind.uniqueInjections",
+    "psxview.not_in_pslist",
+    "psxview.not_in_eprocess_pool",
+    "psxview.not_in_ethread_pool",
+    "psxview.not_in_pspcid_list",
+    "psxview.not_in_csrss_handles",
+    "psxview.not_in_session",
+    "psxview.not_in_deskthrd",
+    "psxview.not_in_pslist_false_avg",
+    "psxview.not_in_eprocess_pool_false_avg",
+    "psxview.not_in_ethread_pool_false_avg",
+    "psxview.not_in_pspcid_list_false_avg",
+    "psxview.not_in_csrss_handles_false_avg",
+    "psxview.not_in_session_false_avg",
+    "psxview.not_in_deskthrd_false_avg",
+    "modules.nmodules",
+    "svcscan.nservices",
+    "svcscan.kernel_drivers",
+    "svcscan.fs_drivers",
+    "svcscan.process_services",
+    "svcscan.shared_process_services",
+    "svcscan.interactive_process_services",
+    "svcscan.nactive",
+    "callbacks.ncallbacks",
+    "callbacks.nanonymous",
+    "callbacks.ngeneric"
+  ],
+  "metrics": {
+    "accuracy": 0.8436006825938567,
+    "macro_f1": 0.7647132124370748,
+    "weighted_f1": 0.8435696817133278,
+    "macro_recall": 0.7647003017019085
+  },
+  "classification_report": {
+    "Benign": {
+      "precision": 0.9996587613035318,
+      "recall": 1.0,
+      "f1-score": 0.9998293515358362,
+      "support": 5859.0
+    },
+    "Ransomware": {
+      "precision": 0.6692667706708268,
+      "recall": 0.6573033707865169,
+      "f1-score": 0.663231125998454,
+      "support": 1958.0
+    },
+    "Spyware": {
+      "precision": 0.7539761431411531,
+      "recall": 0.7566084788029925,
+      "f1-score": 0.7552900174259397,
+      "support": 2005.0
+    },
+    "Trojan": {
+      "precision": 0.6361746361746362,
+      "recall": 0.6448893572181243,
+      "f1-score": 0.640502354788069,
+      "support": 1898.0
+    },
+    "accuracy": 0.8436006825938567,
+    "macro avg": {
+      "precision": 0.7647690778225369,
+      "recall": 0.7647003017019085,
+      "f1-score": 0.7647132124370748,
+      "support": 11720.0
+    },
+    "weighted avg": {
+      "precision": 0.8435671199580498,
+      "recall": 0.8436006825938567,
+      "f1-score": 0.8435696817133278,
+      "support": 11720.0
+    }
+  },
+  "confusion_matrix": {
+    "labels": [
+      "Benign",
+      "Ransomware",
+      "Spyware",
+      "Trojan"
+    ],
+    "counts": [
+      [
+        5859,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        1287,
+        229,
+        442
+      ],
+      [
+        2,
+        228,
+        1517,
+        258
+      ],
+      [
+        0,
+        408,
+        266,
+        1224
+      ]
+    ]
+  },
+  "coverage_accuracy": [
+    {
+      "tau": 0.0,
+      "accepted": 11720,
+      "coverage": 1.0,
+      "accepted_accuracy": 0.8436006825938567
+    },
+    {
+      "tau": 0.5,
+      "accepted": 10737,
+      "coverage": 0.9161262798634813,
+      "accepted_accuracy": 0.8816242898388749
+    },
+    {
+      "tau": 0.6,
+      "accepted": 9673,
+      "coverage": 0.8253412969283277,
+      "accepted_accuracy": 0.9224645921637548
+    },
+    {
+      "tau": 0.65,
+      "accepted": 9186,
+      "coverage": 0.7837883959044368,
+      "accepted_accuracy": 0.9369693011103853
+    },
+    {
+      "tau": 0.7,
+      "accepted": 8745,
+      "coverage": 0.746160409556314,
+      "accepted_accuracy": 0.9491137793024585
+    },
+    {
+      "tau": 0.8,
+      "accepted": 7900,
+      "coverage": 0.674061433447099,
+      "accepted_accuracy": 0.9731645569620253
+    },
+    {
+      "tau": 0.9,
+      "accepted": 7113,
+      "coverage": 0.6069112627986348,
+      "accepted_accuracy": 0.99029945170814
+    },
+    {
+      "tau": 0.95,
+      "accepted": 6674,
+      "coverage": 0.5694539249146757,
+      "accepted_accuracy": 0.9964039556487864
+    },
+    {
+      "tau": 0.99,
+      "accepted": 6250,
+      "coverage": 0.5332764505119454,
+      "accepted_accuracy": 0.99856
+    },
+    {
+      "tau": 1.0,
+      "accepted": 6075,
+      "coverage": 0.518344709897611,
+      "accepted_accuracy": 0.9996707818930041
+    }
+  ],
+  "train_seconds": 2.3587951000081375,
+  "validation_predict_proba_seconds": 0.0664420000393875,
+  "model_bytes": 75941515,
+  "model_sha256": "e71966c42abc31a9fee72e7280175b9261edc97beeff3ea60f84645a9fb15bbc",
+  "selected_model": null,
+  "selected_tau": null,
+  "test_evaluated": false,
+  "reload_new_process_parity": true,
+  "reload_check": {
+    "status": "PASS",
+    "sample_count": 32,
+    "max_absolute_probability_error": 0.0
+  },
+  "versions": {
+    "python": "3.11.9",
+    "numpy": "2.4.6",
+    "pandas": "3.0.5",
+    "scikit-learn": "1.9.0",
+    "joblib": "1.6.0",
+    "matplotlib": "3.11.1",
+    "lightgbm": "4.7.0"
+  }
+}

@@ -1,0 +1,284 @@
+{
+  "algorithm": "random_forest",
+  "params": {
+    "bootstrap": true,
+    "ccp_alpha": 0.0,
+    "class_weight": null,
+    "criterion": "gini",
+    "max_depth": null,
+    "max_features": "sqrt",
+    "max_leaf_nodes": null,
+    "max_samples": null,
+    "min_impurity_decrease": 0.0,
+    "min_samples_leaf": 1,
+    "min_samples_split": 2,
+    "min_weight_fraction_leaf": 0.0,
+    "monotonic_cst": null,
+    "n_estimators": 100,
+    "n_jobs": 2,
+    "oob_score": false,
+    "random_state": 42,
+    "verbose": 0,
+    "warm_start": false
+  },
+  "protocol": {
+    "task": "binary",
+    "labels": [
+      "Benign",
+      "Malware"
+    ],
+    "seed": 42,
+    "split_sha256": "88da6b733625a289fe244fb6018c85cbbb4034f1e8ef45d79dadf0cbd15797b6",
+    "primary_metric": "validation_macro_f1",
+    "tie_break": [
+      "validation_macro_recall_desc",
+      "model_bytes_asc",
+      "algorithm_name_asc"
+    ],
+    "tuning_budget": "one fixed baseline configuration per algorithm; no tuning in these notebooks",
+    "tau_grid": [
+      0.0,
+      0.5,
+      0.6,
+      0.65,
+      0.7,
+      0.8,
+      0.9,
+      0.95,
+      0.99,
+      1.0
+    ],
+    "selected_model": null,
+    "selected_tau": null,
+    "test_evaluation": "excluded; requires a separate frozen final decision",
+    "caveats": [
+      "token grouping is not verified specimen identity",
+      "benign host/session metadata unavailable",
+      "near duplicates and collection artifacts not ruled out",
+      "local CSV has 55 numeric features rather than PDF description of 56",
+      "no byte-identity verification against UNB master"
+    ],
+    "models": {
+      "random_forest": {
+        "n_estimators": 100,
+        "random_state": 42,
+        "n_jobs": 2
+      },
+      "lightgbm": {
+        "n_estimators": 100,
+        "learning_rate": 0.1,
+        "num_leaves": 31,
+        "random_state": 42,
+        "n_jobs": 2,
+        "deterministic": true,
+        "force_col_wise": true,
+        "verbosity": -1
+      }
+    }
+  },
+  "protocol_sha256": "9e776e9fdb820fb26fdf2ff2afd580125c297c1b2b32840dc936e2665de04c47",
+  "raw_sha256": "df27cc6d4ffef0388c6114d459e7ce5c9a099ecf7ae6606d06eaa4093980bcf3",
+  "split_sha256": "88da6b733625a289fe244fb6018c85cbbb4034f1e8ef45d79dadf0cbd15797b6",
+  "preprocessing_sha256": "50db26dd3c868dd8be786cb0d2d33e640ee678de6c3e1a33f8f90988afb4dc90",
+  "notebook_sha256_at_start": "5c7f1c4bd44368255a5e2c66d813f9834f70515d41373412f0ad06acfeec049f",
+  "status": "completed",
+  "run_id": "20261109T023633Z_850cf008",
+  "rows": {
+    "train": 35156,
+    "validation": 11720
+  },
+  "classes": [
+    "Benign",
+    "Malware"
+  ],
+  "features": [
+    "pslist.nproc",
+    "pslist.nppid",
+    "pslist.avg_threads",
+    "pslist.nprocs64bit",
+    "pslist.avg_handlers",
+    "dlllist.ndlls",
+    "dlllist.avg_dlls_per_proc",
+    "handles.nhandles",
+    "handles.avg_handles_per_proc",
+    "handles.nport",
+    "handles.nfile",
+    "handles.nevent",
+    "handles.ndesktop",
+    "handles.nkey",
+    "handles.nthread",
+    "handles.ndirectory",
+    "handles.nsemaphore",
+    "handles.ntimer",
+    "handles.nsection",
+    "handles.nmutant",
+    "ldrmodules.not_in_load",
+    "ldrmodules.not_in_init",
+    "ldrmodules.not_in_mem",
+    "ldrmodules.not_in_load_avg",
+    "ldrmodules.not_in_init_avg",
+    "ldrmodules.not_in_mem_avg",
+    "malfind.ninjections",
+    "malfind.commitCharge",
+    "malfind.protection",
+    "malfind.uniqueInjections",
+    "psxview.not_in_pslist",
+    "psxview.not_in_eprocess_pool",
+    "psxview.not_in_ethread_pool",
+    "psxview.not_in_pspcid_list",
+    "psxview.not_in_csrss_handles",
+    "psxview.not_in_session",
+    "psxview.not_in_deskthrd",
+    "psxview.not_in_pslist_false_avg",
+    "psxview.not_in_eprocess_pool_false_avg",
+    "psxview.not_in_ethread_pool_false_avg",
+    "psxview.not_in_pspcid_list_false_avg",
+    "psxview.not_in_csrss_handles_false_avg",
+    "psxview.not_in_session_false_avg",
+    "psxview.not_in_deskthrd_false_avg",
+    "modules.nmodules",
+    "svcscan.nservices",
+    "svcscan.kernel_drivers",
+    "svcscan.fs_drivers",
+    "svcscan.process_services",
+    "svcscan.shared_process_services",
+    "svcscan.interactive_process_services",
+    "svcscan.nactive",
+    "callbacks.ncallbacks",
+    "callbacks.nanonymous",
+    "callbacks.ngeneric"
+  ],
+  "metrics": {
+    "accuracy": 0.999914675767918,
+    "macro_f1": 0.9999146757672969,
+    "weighted_f1": 0.9999146757685392,
+    "macro_recall": 0.999914690325883
+  },
+  "classification_report": {
+    "Benign": {
+      "precision": 0.9998293515358362,
+      "recall": 1.0,
+      "f1-score": 0.9999146684870722,
+      "support": 5859.0
+    },
+    "Malware": {
+      "precision": 1.0,
+      "recall": 0.999829380651766,
+      "f1-score": 0.9999146830475215,
+      "support": 5861.0
+    },
+    "accuracy": 0.999914675767918,
+    "macro avg": {
+      "precision": 0.999914675767918,
+      "recall": 0.999914690325883,
+      "f1-score": 0.9999146757672969,
+      "support": 11720.0
+    },
+    "weighted avg": {
+      "precision": 0.9999146903283673,
+      "recall": 0.999914675767918,
+      "f1-score": 0.9999146757685392,
+      "support": 11720.0
+    }
+  },
+  "confusion_matrix": {
+    "labels": [
+      "Benign",
+      "Malware"
+    ],
+    "counts": [
+      [
+        5859,
+        0
+      ],
+      [
+        1,
+        5860
+      ]
+    ]
+  },
+  "coverage_accuracy": [
+    {
+      "tau": 0.0,
+      "accepted": 11720,
+      "coverage": 1.0,
+      "accepted_accuracy": 0.999914675767918
+    },
+    {
+      "tau": 0.5,
+      "accepted": 11720,
+      "coverage": 1.0,
+      "accepted_accuracy": 0.999914675767918
+    },
+    {
+      "tau": 0.6,
+      "accepted": 11716,
+      "coverage": 0.9996587030716724,
+      "accepted_accuracy": 1.0
+    },
+    {
+      "tau": 0.65,
+      "accepted": 11713,
+      "coverage": 0.9994027303754266,
+      "accepted_accuracy": 1.0
+    },
+    {
+      "tau": 0.7,
+      "accepted": 11708,
+      "coverage": 0.9989761092150171,
+      "accepted_accuracy": 1.0
+    },
+    {
+      "tau": 0.8,
+      "accepted": 11704,
+      "coverage": 0.9986348122866894,
+      "accepted_accuracy": 1.0
+    },
+    {
+      "tau": 0.9,
+      "accepted": 11699,
+      "coverage": 0.9982081911262799,
+      "accepted_accuracy": 1.0
+    },
+    {
+      "tau": 0.95,
+      "accepted": 11687,
+      "coverage": 0.9971843003412969,
+      "accepted_accuracy": 1.0
+    },
+    {
+      "tau": 0.99,
+      "accepted": 11626,
+      "coverage": 0.9919795221843003,
+      "accepted_accuracy": 1.0
+    },
+    {
+      "tau": 1.0,
+      "accepted": 11549,
+      "coverage": 0.9854095563139932,
+      "accepted_accuracy": 1.0
+    }
+  ],
+  "train_seconds": 1.287084900017362,
+  "validation_predict_proba_seconds": 0.03552880004281178,
+  "model_bytes": 528043,
+  "model_sha256": "9994c80a5c92be46e3d92f75747d558435d7dfc3c8bd56433e3bbe012137c0ad",
+  "selected_model": null,
+  "selected_tau": null,
+  "test_evaluated": false,
+  "reload_new_process_parity": true,
+  "reload_check": {
+    "status": "PASS",
+    "sample_count": 32,
+    "max_absolute_probability_error": 0.0
+  },
+  "versions": {
+    "python": "3.11.9",
+    "numpy": "2.4.6",
+    "pandas": "3.0.5",
+    "scikit-learn": "1.9.0",
+    "joblib": "1.6.0",
+    "matplotlib": "3.11.1",
+    "lightgbm": "4.7.0"
+  }
+}

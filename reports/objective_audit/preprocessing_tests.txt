@@ -1,0 +1,9 @@
+test_related_components_transitive (test_preprocessing.PreprocessingTests.test_related_components_transitive) ... ok
+test_serialization_new_process (test_preprocessing.PreprocessingTests.test_serialization_new_process) ... ok
+test_split_persistence_and_tasks (test_preprocessing.PreprocessingTests.test_split_persistence_and_tasks) ... ok
+test_train_statistics_and_preserved_extremes (test_preprocessing.PreprocessingTests.test_train_statistics_and_preserved_extremes) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 11.487s
+
+OK

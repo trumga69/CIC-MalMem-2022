@@ -1,0 +1,88 @@
+{
+  "algorithm": "lightgbm",
+  "params": {
+    "boosting_type": "gbdt",
+    "class_weight": null,
+    "colsample_bytree": 1.0,
+    "importance_type": "split",
+    "learning_rate": 0.1,
+    "max_depth": -1,
+    "min_child_samples": 20,
+    "min_child_weight": 0.001,
+    "min_split_gain": 0.0,
+    "n_estimators": 100,
+    "n_jobs": 2,
+    "num_leaves": 31,
+    "objective": null,
+    "random_state": 42,
+    "reg_alpha": 0.0,
+    "reg_lambda": 0.0,
+    "subsample": 1.0,
+    "subsample_for_bin": 200000,
+    "subsample_freq": 0,
+    "deterministic": true,
+    "force_col_wise": true,
+    "verbosity": -1
+  },
+  "protocol": {
+    "task": "binary",
+    "labels": [
+      "Benign",
+      "Malware"
+    ],
+    "seed": 42,
+    "split_sha256": "88da6b733625a289fe244fb6018c85cbbb4034f1e8ef45d79dadf0cbd15797b6",
+    "primary_metric": "validation_macro_f1",
+    "tie_break": [
+      "validation_macro_recall_desc",
+      "model_bytes_asc",
+      "algorithm_name_asc"
+    ],
+    "tuning_budget": "one fixed baseline configuration per algorithm; no tuning in these notebooks",
+    "tau_grid": [
+      0.0,
+      0.5,
+      0.6,
+      0.65,
+      0.7,
+      0.8,
+      0.9,
+      0.95,
+      0.99,
+      1.0
+    ],
+    "selected_model": null,
+    "selected_tau": null,
+    "test_evaluation": "excluded; requires a separate frozen final decision",
+    "caveats": [
+      "token grouping is not verified specimen identity",
+      "benign host/session metadata unavailable",
+      "near duplicates and collection artifacts not ruled out",
+      "local CSV has 55 numeric features rather than PDF description of 56",
+      "no byte-identity verification against UNB master"
+    ],
+    "models": {
+      "random_forest": {
+        "n_estimators": 100,
+        "random_state": 42,
+        "n_jobs": 2
+      },
+      "lightgbm": {
+        "n_estimators": 100,
+        "learning_rate": 0.1,
+        "num_leaves": 31,
+        "random_state": 42,
+        "n_jobs": 2,
+        "deterministic": true,
+        "force_col_wise": true,
+        "verbosity": -1
+      }
+    }
+  },
+  "protocol_sha256": "9e776e9fdb820fb26fdf2ff2afd580125c297c1b2b32840dc936e2665de04c47",
+  "raw_sha256": "df27cc6d4ffef0388c6114d459e7ce5c9a099ecf7ae6606d06eaa4093980bcf3",
+  "split_sha256": "88da6b733625a289fe244fb6018c85cbbb4034f1e8ef45d79dadf0cbd15797b6",
+  "preprocessing_sha256": "ac1a2096b7f0e5e75800bf2a7b4cfed0dadc24762677a455c5e733a5e1fc2feb",
+  "notebook_sha256_at_start": "ec2b6a4495584bc6563610dd532e021034af5f9578bce5430cf41527315b22dc",
+  "status": "started"
+}

@@ -1,0 +1,304 @@
+{
+  "python": "3.11.9",
+  "raw_files": {
+    "Obfuscated-MalMem2022.csv": {
+      "sha256": "df27cc6d4ffef0388c6114d459e7ce5c9a099ecf7ae6606d06eaa4093980bcf3",
+      "bytes": 18921276,
+      "shape": [
+        58596,
+        57
+      ],
+      "same_schema": true,
+      "rows_matching_full_dataset": 58596
+    },
+    "Output1.csv": {
+      "sha256": "3330b0226fb5c9dbcfea80d7971b13bfd7c4d5d8805253b79bad45fd52674df5",
+      "bytes": 64488,
+      "shape": [
+        150,
+        56
+      ],
+      "same_schema": false
+    },
+    "output2.csv": {
+      "sha256": "ffc4943e1cc8ebe3f9cf2bb046dc6feae2092e8d9c95f1d7663e3bef7af56aef",
+      "bytes": 149685,
+      "shape": [
+        350,
+        56
+      ],
+      "same_schema": false
+    },
+    "output3.csv": {
+      "sha256": "349a8c7a85f6732f9594c43836d1c76293ed232444332fe2f4a41a25254e4fe1",
+      "bytes": 152875,
+      "shape": [
+        350,
+        56
+      ],
+      "same_schema": false
+    }
+  },
+  "pdf_sha256": "f4203f80f6ce94713b05b6429d8d9ef4915e5c17733ca31533f3db8c53299bfb",
+  "shape": [
+    58596,
+    57
+  ],
+  "feature_count": 55,
+  "feature_columns": [
+    "pslist.nproc",
+    "pslist.nppid",
+    "pslist.avg_threads",
+    "pslist.nprocs64bit",
+    "pslist.avg_handlers",
+    "dlllist.ndlls",
+    "dlllist.avg_dlls_per_proc",
+    "handles.nhandles",
+    "handles.avg_handles_per_proc",
+    "handles.nport",
+    "handles.nfile",
+    "handles.nevent",
+    "handles.ndesktop",
+    "handles.nkey",
+    "handles.nthread",
+    "handles.ndirectory",
+    "handles.nsemaphore",
+    "handles.ntimer",
+    "handles.nsection",
+    "handles.nmutant",
+    "ldrmodules.not_in_load",
+    "ldrmodules.not_in_init",
+    "ldrmodules.not_in_mem",
+    "ldrmodules.not_in_load_avg",
+    "ldrmodules.not_in_init_avg",
+    "ldrmodules.not_in_mem_avg",
+    "malfind.ninjections",
+    "malfind.commitCharge",
+    "malfind.protection",
+    "malfind.uniqueInjections",
+    "psxview.not_in_pslist",
+    "psxview.not_in_eprocess_pool",
+    "psxview.not_in_ethread_pool",
+    "psxview.not_in_pspcid_list",
+    "psxview.not_in_csrss_handles",
+    "psxview.not_in_session",
+    "psxview.not_in_deskthrd",
+    "psxview.not_in_pslist_false_avg",
+    "psxview.not_in_eprocess_pool_false_avg",
+    "psxview.not_in_ethread_pool_false_avg",
+    "psxview.not_in_pspcid_list_false_avg",
+    "psxview.not_in_csrss_handles_false_avg",
+    "psxview.not_in_session_false_avg",
+    "psxview.not_in_deskthrd_false_avg",
+    "modules.nmodules",
+    "svcscan.nservices",
+    "svcscan.kernel_drivers",
+    "svcscan.fs_drivers",
+    "svcscan.process_services",
+    "svcscan.shared_process_services",
+    "svcscan.interactive_process_services",
+    "svcscan.nactive",
+    "callbacks.ncallbacks",
+    "callbacks.nanonymous",
+    "callbacks.ngeneric"
+  ],
+  "dtypes": {
+    "Category": "str",
+    "pslist.nproc": "int64",
+    "pslist.nppid": "int64",
+    "pslist.avg_threads": "float64",
+    "pslist.nprocs64bit": "int64",
+    "pslist.avg_handlers": "float64",
+    "dlllist.ndlls": "int64",
+    "dlllist.avg_dlls_per_proc": "float64",
+    "handles.nhandles": "int64",
+    "handles.avg_handles_per_proc": "float64",
+    "handles.nport": "int64",
+    "handles.nfile": "int64",
+    "handles.nevent": "int64",
+    "handles.ndesktop": "int64",
+    "handles.nkey": "int64",
+    "handles.nthread": "int64",
+    "handles.ndirectory": "int64",
+    "handles.nsemaphore": "int64",
+    "handles.ntimer": "int64",
+    "handles.nsection": "int64",
+    "handles.nmutant": "int64",
+    "ldrmodules.not_in_load": "int64",
+    "ldrmodules.not_in_init": "int64",
+    "ldrmodules.not_in_mem": "int64",
+    "ldrmodules.not_in_load_avg": "float64",
+    "ldrmodules.not_in_init_avg": "float64",
+    "ldrmodules.not_in_mem_avg": "float64",
+    "malfind.ninjections": "int64",
+    "malfind.commitCharge": "int64",
+    "malfind.protection": "int64",
+    "malfind.uniqueInjections": "float64",
+    "psxview.not_in_pslist": "int64",
+    "psxview.not_in_eprocess_pool": "int64",
+    "psxview.not_in_ethread_pool": "int64",
+    "psxview.not_in_pspcid_list": "int64",
+    "psxview.not_in_csrss_handles": "int64",
+    "psxview.not_in_session": "int64",
+    "psxview.not_in_deskthrd": "int64",
+    "psxview.not_in_pslist_false_avg": "float64",
+    "psxview.not_in_eprocess_pool_false_avg": "float64",
+    "psxview.not_in_ethread_pool_false_avg": "float64",
+    "psxview.not_in_pspcid_list_false_avg": "float64",
+    "psxview.not_in_csrss_handles_false_avg": "float64",
+    "psxview.not_in_session_false_avg": "float64",
+    "psxview.not_in_deskthrd_false_avg": "float64",
+    "modules.nmodules": "int64",
+    "svcscan.nservices": "int64",
+    "svcscan.kernel_drivers": "int64",
+    "svcscan.fs_drivers": "int64",
+    "svcscan.process_services": "int64",
+    "svcscan.shared_process_services": "int64",
+    "svcscan.interactive_process_services": "int64",
+    "svcscan.nactive": "int64",
+    "callbacks.ncallbacks": "int64",
+    "callbacks.nanonymous": "int64",
+    "callbacks.ngeneric": "int64",
+    "Class": "str"
+  },
+  "binary_counts": {
+    "Benign": 29298,
+    "Malware": 29298
+  },
+  "multiclass_counts": {
+    "Benign": 29298,
+    "Spyware": 10020,
+    "Ransomware": 9791,
+    "Trojan": 9487
+  },
+  "missing_cells": 0,
+  "infinite_cells": 0,
+  "constant_columns": [
+    "pslist.nprocs64bit",
+    "handles.nport",
+    "svcscan.interactive_process_services"
+  ],
+  "near_constant_99pct": {
+    "pslist.nprocs64bit": 1.0,
+    "handles.nport": 1.0,
+    "psxview.not_in_eprocess_pool": 0.9979179466175165,
+    "psxview.not_in_eprocess_pool_false_avg": 0.9949996586797734,
+    "svcscan.fs_drivers": 0.9989589733087583,
+    "svcscan.interactive_process_services": 1.0,
+    "callbacks.nanonymous": 0.9991466994334084,
+    "callbacks.ngeneric": 0.9998805379206772
+  },
+  "identical_column_pairs": [
+    [
+      "pslist.nprocs64bit",
+      "handles.nport"
+    ],
+    [
+      "pslist.nprocs64bit",
+      "svcscan.interactive_process_services"
+    ],
+    [
+      "handles.nport",
+      "svcscan.interactive_process_services"
+    ]
+  ],
+  "negative_cells": 0,
+  "duplicate_full_excess": 534,
+  "duplicate_features_excess": 569,
+  "rows_in_duplicate_feature_groups": 1086,
+  "binary_conflict_groups": 0,
+  "multiclass_conflict_groups": 9,
+  "connected_groups": 32087,
+  "groups_crossing_splits": 0,
+  "exact_features_crossing_splits": 0,
+  "tokens_crossing_splits": 0,
+  "unparsed_malware_tokens": 0,
+  "token_lengths": {
+    "64.0": 23718,
+    "32.0": 5150,
+    "21.0": 360,
+    "31.0": 70
+  },
+  "split_counts": {
+    "Benign": {
+      "test": 5859,
+      "train": 17580,
+      "validation": 5859
+    },
+    "Ransomware": {
+      "test": 1958,
+      "train": 5875,
+      "validation": 1958
+    },
+    "Spyware": {
+      "test": 2006,
+      "train": 6009,
+      "validation": 2005
+    },
+    "Trojan": {
+      "test": 1897,
+      "train": 5692,
+      "validation": 1898
+    }
+  },
+  "split_sha256": "88da6b733625a289fe244fb6018c85cbbb4034f1e8ef45d79dadf0cbd15797b6",
+  "metric_provenance_matches": {
+    "raw_sha256": true,
+    "split_sha256": true,
+    "preprocessing_sha256": true
+  },
+  "validation_prediction_columns": [
+    "row_index",
+    "actual",
+    "predicted",
+    "score_Benign",
+    "score_Malware"
+  ],
+  "validation_prediction_rows": 11720,
+  "notebooks_present": [],
+  "model_files_present": [],
+  "lightgbm_available": false,
+  "auxiliary_csv_checks": {
+    "Output1.csv": {
+      "missing_columns": [
+        "Category",
+        "Class"
+      ],
+      "extra_columns": [
+        "Filename"
+      ],
+      "shared_columns": 55,
+      "rows_matching_full_on_shared_columns": 0
+    },
+    "output2.csv": {
+      "missing_columns": [
+        "Category",
+        "Class"
+      ],
+      "extra_columns": [
+        "Filename"
+      ],
+      "shared_columns": 55,
+      "rows_matching_full_on_shared_columns": 0
+    },
+    "output3.csv": {
+      "missing_columns": [
+        "Category",
+        "Class"
+      ],
+      "extra_columns": [
+        "Filename"
+      ],
+      "shared_columns": 55,
+      "rows_matching_full_on_shared_columns": 0
+    }
+  },
+  "stored_prediction_checks": {
+    "validation_row_ids_match": true,
+    "unique_row_ids": true,
+    "actual_labels_match_raw": true,
+    "recomputed_accuracy": 0.999914675767918,
+    "recomputed_macro_f1": 0.9999146757672969
+  },
+  "local_git_directory_present": false
+}
