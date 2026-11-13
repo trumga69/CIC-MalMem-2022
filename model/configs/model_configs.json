@@ -1,0 +1,145 @@
+{
+  "topic": "Topic 05 - CIC-MalMem-2022",
+  "split_ratios": {
+    "train": 0.7,
+    "validation": 0.15,
+    "test": 0.15
+  },
+  "expected_rows": {
+    "train": 41013,
+    "validation": 8792,
+    "test": 8791
+  },
+  "expected_features": 55,
+  "pdf_stated_features": 56,
+  "tau_grid": [
+    0.0,
+    0.5,
+    0.55,
+    0.6,
+    0.65,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95,
+    0.99
+  ],
+  "selection_rules": {
+    "binary": {
+      "primary_metric": "val_macro_f1",
+      "tie_breakers": [
+        "val_pr_auc",
+        "neg_val_fpr",
+        "neg_val_log_loss",
+        "neg_train_seconds"
+      ],
+      "tau_policy": "Maximize accepted_macro_f1 (tie-break: lowest accepted_fpr, highest accepted_accuracy) over tau in tau_grid with tau >= 0.65 and coverage >= 0.995",
+      "min_tau": 0.65,
+      "min_coverage": 0.995
+    },
+    "multiclass": {
+      "primary_metric": "val_macro_f1",
+      "tie_breakers": [
+        "val_balanced_accuracy",
+        "val_ovr_pr_auc",
+        "neg_val_log_loss",
+        "neg_train_seconds"
+      ],
+      "tau_policy": "Maximize accepted_macro_f1 (tie-break: highest accepted_accuracy, highest coverage) over tau in tau_grid with tau >= 0.65 and coverage >= 0.70",
+      "min_tau": 0.65,
+      "min_coverage": 0.7
+    }
+  },
+  "candidates": {
+    "random_forest": {
+      "rf_100_dNone": {
+        "n_estimators": 100,
+        "max_depth": null,
+        "min_samples_leaf": 1,
+        "max_features": "sqrt",
+        "class_weight": null,
+        "random_state": 42,
+        "n_jobs": -1
+      },
+      "rf_200_dNone": {
+        "n_estimators": 200,
+        "max_depth": null,
+        "min_samples_leaf": 1,
+        "max_features": "sqrt",
+        "class_weight": null,
+        "random_state": 42,
+        "n_jobs": -1
+      },
+      "rf_300_d20": {
+        "n_estimators": 300,
+        "max_depth": 20,
+        "min_samples_leaf": 1,
+        "max_features": "sqrt",
+        "class_weight": null,
+        "random_state": 42,
+        "n_jobs": -1
+      },
+      "rf_300_dNone_leaf2": {
+        "n_estimators": 300,
+        "max_depth": null,
+        "min_samples_leaf": 2,
+        "max_features": "sqrt",
+        "class_weight": null,
+        "random_state": 42,
+        "n_jobs": -1
+      }
+    },
+    "lightgbm": {
+      "lgbm_100_lr01_leaves31": {
+        "n_estimators": 100,
+        "learning_rate": 0.1,
+        "num_leaves": 31,
+        "max_depth": -1,
+        "min_child_samples": 20,
+        "subsample": 1.0,
+        "colsample_bytree": 1.0,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "lgbm_200_lr005_leaves31": {
+        "n_estimators": 200,
+        "learning_rate": 0.05,
+        "num_leaves": 31,
+        "max_depth": -1,
+        "min_child_samples": 20,
+        "subsample": 0.9,
+        "colsample_bytree": 0.9,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "lgbm_300_lr005_leaves63": {
+        "n_estimators": 300,
+        "learning_rate": 0.05,
+        "num_leaves": 63,
+        "max_depth": -1,
+        "min_child_samples": 20,
+        "subsample": 0.9,
+        "colsample_bytree": 0.9,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      },
+      "lgbm_200_lr01_leaves63_d12": {
+        "n_estimators": 200,
+        "learning_rate": 0.1,
+        "num_leaves": 63,
+        "max_depth": 12,
+        "min_child_samples": 20,
+        "subsample": 0.9,
+        "colsample_bytree": 0.9,
+        "random_state": 42,
+        "n_jobs": -1,
+        "verbose": -1
+      }
+    }
+  }
+}

@@ -1,0 +1,11 @@
+metric,value
+n_rows,58596
+n_features,55
+n_missing_values,0
+n_infinite_values,0
+n_constant_columns,3
+n_duplicate_full_rows,534
+n_duplicate_feature_rows,569
+n_binary_conflict_groups,0
+n_invalid_category_rows,0
+n_binary_label_mismatch_rows,0

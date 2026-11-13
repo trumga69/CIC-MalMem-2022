@@ -1,831 +1,931 @@
-"""Ứng dụng Streamlit: Web Demo Topic 05 — CIC-MalMem-2022.
+"""Web Demo Streamlit - Topic 05: CIC-MalMem-2022 Forensic Memory Analysis.
 
-Phân loại bộ nhớ độc hại (Task A nhị phân và Task B đa lớp)
-kèm cơ chế từ chối (Uncertain rejection với tau) và giải thích cục bộ Top-3.
-Giao diện Cyber Defense / SOC Threat Intelligence Terminal (White Base + Chakra Petch & JetBrains Mono Fonts).
+Tệp app tự chứa đầy đủ (Self-Contained) cho TV5 bàn giao nhóm trưởng:
+- Hỗ trợ toàn diện 4 mô hình theo model/configs/inference.json:
+  + Task A (Binary Triage): 02_binary_lightgbm (Mặc định, tau=0.95), 01_binary_random_forest (tau=0.95)
+  + Task B (Multiclass Threat Family): 04_multiclass_lightgbm (Mặc định, tau=0.80), 03_multiclass_random_forest (tau=0.70)
+- Tự động dò tìm thư mục gốc dự án (hoạt động tốt dù đặt ở root hay trong thư mục app/)
+- Xác thực hợp đồng dữ liệu nghiêm ngặt (55 features, bắt lỗi rỗng, trùng cột header, thiếu/dư cột, phi số, vô cực, tự động loại bỏ cột nhãn Class/Category/multiclass nếu nạp file thô)
+- Suy luận xác suất, so sánh p_max >= tau trước khi làm tròn số, cơ chế từ chối Uncertain
+- Giải thích cục bộ Local Top-3:
+  + LightGBM: pred_contrib, đảo dấu Benign cho Binary, trích xuất khối cho Multiclass, kiểm chứng sai số khớp raw margin (|Δ| < 1e-4)
+  + Random Forest: thông báo trạng thái chưa hỗ trợ theo đúng đặc tả bàn giao
+- Giao diện High-Tech White SOC Cyberpunk với font Chakra Petch & JetBrains Mono hỗ trợ tiếng Việt.
 """
+import collections
+import csv
 import io
 import json
+import os
+import sys
+import warnings
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-import matplotlib.pyplot as plt
+import joblib
 import numpy as np
 import pandas as pd
 import streamlit as st
 
-from src.explanation import compute_local_top3
-from src.triage import (
-    get_project_root,
-    load_operating_config,
-    load_pipeline_for_task,
-    predict_batch,
-    validate_csv_input,
-)
+# Bỏ qua các cảnh báo minor scikit-learn unpickle
+warnings.filterwarnings("ignore", category=UserWarning)
+try:
+    from sklearn.exceptions import InconsistentVersionWarning
+    warnings.filterwarnings("ignore", category=InconsistentVersionWarning)
+except ImportError:
+    pass
 
-# Cấu hình font tiếng Việt và typography cho Matplotlib
-plt.rcParams['font.sans-serif'] = ['Segoe UI', 'DejaVu Sans', 'Arial', 'sans-serif']
-plt.rcParams['font.family'] = 'sans-serif'
 
-# Cấu hình trang chuẩn an ninh mạng
+# =============================================================================
+# 1. HỆ THỐNG XÁC ĐỊNH PROJECT ROOT & IMPORT TƯƠNG THÍCH
+# =============================================================================
+def get_project_root() -> Path:
+    """Tìm thư mục gốc của dự án (nơi chứa model/configs/inference.json)."""
+    curr = Path(__file__).resolve().parent
+    for p in [curr] + list(curr.parents):
+        if (p / "model" / "configs" / "inference.json").exists():
+            return p
+    return curr
+
+ROOT_DIR = get_project_root()
+# Thêm ROOT_DIR và preprocessing_data vào sys.path để unpickler nhận diện module
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+prep_dir = ROOT_DIR / "preprocessing_data"
+if prep_dir.exists() and str(prep_dir) not in sys.path:
+    sys.path.insert(0, str(prep_dir))
+
+# Import preprocessing (nếu có) để hỗ trợ unpickle pipeline
+try:
+    import preprocessing  # noqa: F401
+except ImportError:
+    pass
+
+
+# =============================================================================
+# 2. MODULE TRIAGE & NẠP MODEL
+# =============================================================================
+def load_inference_config(config_path: Union[str, Path] = "model/configs/inference.json") -> Dict[str, Any]:
+    """Đọc file cấu hình inference.json."""
+    p = Path(config_path)
+    if not p.is_absolute():
+        p = ROOT_DIR / p
+    if not p.exists():
+        raise FileNotFoundError(f"Không tìm thấy file cấu hình: {p}")
+    with open(p, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def load_model_report(report_path: Union[str, Path] = "model/reports/model_report.json") -> Dict[str, Any]:
+    """Đọc file báo cáo chuẩn hóa model_report.json."""
+    p = Path(report_path)
+    if not p.is_absolute():
+        p = ROOT_DIR / p
+    if not p.exists():
+        return {}
+    with open(p, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def load_pipeline_for_model(model_id: str, config: Optional[Dict[str, Any]] = None) -> Tuple[Any, Dict[str, Any]]:
+    """Nạp fitted pipeline và thông số của model_id."""
+    if config is None:
+        config = load_inference_config()
+
+    models_cfg = config.get("models", {})
+    if model_id not in models_cfg:
+        raise ValueError(f"Model ID '{model_id}' không tồn tại trong cấu hình inference.json.")
+
+    model_info = dict(models_cfg[model_id])
+    model_info["model_id"] = model_id
+    artifact_path = ROOT_DIR / model_info["artifact"]
+
+    if not artifact_path.exists():
+        raise FileNotFoundError(f"Không tìm thấy artifact tại: {artifact_path}")
+
+    pipeline = joblib.load(artifact_path)
+    return pipeline, model_info
+
+
+def validate_csv_input(
+    input_source: Union[bytes, str, Path, io.StringIO, io.BytesIO, Any],
+    expected_features: List[str],
+    auto_drop_labels: bool = True
+) -> pd.DataFrame:
+    """Xác thực và chuẩn hóa CSV theo đúng 55 features của model."""
+    if isinstance(input_source, (str, Path)):
+        p = Path(input_source)
+        if p.exists() and p.is_file():
+            text = p.read_text(encoding="utf-8", errors="replace")
+        else:
+            text = str(input_source)
+    elif isinstance(input_source, bytes):
+        text = input_source.decode("utf-8", errors="replace")
+    elif hasattr(input_source, "read"):
+        content = input_source.read()
+        text = content.decode("utf-8", errors="replace") if isinstance(content, bytes) else str(content)
+    elif isinstance(input_source, pd.DataFrame):
+        return _validate_dataframe(input_source, expected_features, auto_drop_labels=auto_drop_labels)
+    else:
+        raise ValueError("Định dạng dữ liệu đầu vào không được hỗ trợ.")
+
+    text_stripped = text.strip()
+    if not text_stripped:
+        raise ValueError("Tập tin CSV rỗng: không có dữ liệu hoặc tiêu đề.")
+
+    # Kiểm tra header thô để bắt cột trùng tên
+    reader = csv.reader(io.StringIO(text_stripped))
+    try:
+        raw_header = next(reader)
+    except StopIteration:
+        raise ValueError("Tập tin CSV không đọc được dòng tiêu đề.")
+
+    if not raw_header or all(not h.strip() for h in raw_header):
+        raise ValueError("Dòng tiêu đề của CSV rỗng.")
+
+    clean_header = [h.strip() for h in raw_header]
+    col_counts = collections.Counter(clean_header)
+    duplicates = [col for col, count in col_counts.items() if count > 1]
+    if duplicates:
+        raise ValueError(f"CSV không hợp lệ: chứa {len(duplicates)} tên cột bị trùng lặp: {duplicates}.")
+
+    try:
+        df = pd.read_csv(io.StringIO(text_stripped))
+    except Exception as e:
+        raise ValueError(f"Không thể phân tích cú pháp CSV: {str(e)}")
+
+    if len(df) == 0:
+        raise ValueError("Bảng dữ liệu rỗng: CSV có header nhưng không chứa dòng dữ liệu nào.")
+
+    return _validate_dataframe(df, expected_features, auto_drop_labels=auto_drop_labels)
+
+
+def _validate_dataframe(df: pd.DataFrame, expected_features: List[str], auto_drop_labels: bool = True) -> pd.DataFrame:
+    """Kiểm tra chi tiết DataFrame."""
+    cols = list(df.columns)
+    col_counts = collections.Counter(cols)
+    duplicates = [col for col, count in col_counts.items() if count > 1]
+    if duplicates:
+        raise ValueError(f"Dữ liệu chứa cột trùng lặp: {duplicates}")
+
+    # Tự động gạt bỏ nhãn ground-truth/metadata nếu người dùng tải raw dataset
+    KNOWN_LABEL_COLS = {"Class", "Category", "multiclass", "Filename", "row_index", "group_id"}
+    if auto_drop_labels:
+        label_extras = [c for c in cols if c in KNOWN_LABEL_COLS and c not in expected_features]
+        if label_extras:
+            df = df.drop(columns=label_extras)
+            cols = list(df.columns)
+
+    missing = [c for c in expected_features if c not in cols]
+    extra = [c for c in cols if c not in expected_features]
+    if missing or extra:
+        err_parts = []
+        if missing:
+            err_parts.append(f"Thiếu {len(missing)} cột: {missing}")
+        if extra:
+            err_parts.append(f"Dư {len(extra)} cột: {extra}")
+        raise ValueError("Không khớp schema 55 features: " + "; ".join(err_parts))
+
+    # Sắp xếp lại đúng thứ tự model
+    X = df[expected_features].copy()
+
+    # Kiểm tra chữ rác phi số (giữ lại NaN để imputer xử lý)
+    for col in expected_features:
+        series = X[col]
+        coerced = pd.to_numeric(series, errors="coerce")
+        orig_non_null = series.notna() & (series.astype(str).str.strip().str.lower() != "nan") & (series.astype(str).str.strip() != "")
+        garbage_mask = orig_non_null & coerced.isna()
+        if garbage_mask.any():
+            sample_bad = series[garbage_mask].iloc[:3].tolist()
+            raise ValueError(f"Cột '{col}' chứa giá trị chữ rác không phải số: {sample_bad}.")
+        X[col] = coerced.astype(float)
+
+    # Kiểm tra infinity
+    arr = X.to_numpy(dtype=float)
+    if np.isinf(arr).any():
+        inf_cols = [c for c in expected_features if np.isinf(X[c].dropna().to_numpy()).any()]
+        raise ValueError(f"Dữ liệu chứa giá trị vô cực (infinity / -inf) tại các cột: {inf_cols}.")
+
+    return X
+
+
+def predict_batch(
+    pipeline: Any,
+    X_validated: pd.DataFrame,
+    tau: float,
+    rejection_label: str = "Uncertain"
+) -> Tuple[pd.DataFrame, np.ndarray]:
+    """Suy luận xác suất và áp dụng cơ chế từ chối p_max >= tau trước khi làm tròn."""
+    probas = pipeline.predict_proba(X_validated)
+    classes = list(pipeline.classes_)
+
+    argmax_indices = np.argmax(probas, axis=1)
+    p_max_values = probas[np.arange(len(probas)), argmax_indices]
+    candidate_classes = [classes[idx] for idx in argmax_indices]
+
+    # So sánh p_max >= tau TRƯỚC KHI làm tròn
+    decisions = [
+        candidate_classes[i] if p_max_values[i] >= tau else rejection_label
+        for i in range(len(probas))
+    ]
+
+    records = []
+    for i in range(len(probas)):
+        rec = {
+            "Dòng": i,
+            "Kết quả": decisions[i],
+            "Lớp ứng viên": candidate_classes[i],
+            "p_max": float(p_max_values[i]),
+            "Ngưỡng tau": float(tau),
+            "Đạt ngưỡng": bool(p_max_values[i] >= tau)
+        }
+        for j, cls_name in enumerate(classes):
+            rec[f"Score_{cls_name}"] = float(probas[i, j])
+        records.append(rec)
+
+    return pd.DataFrame(records), probas
+
+
+# =============================================================================
+# 3. MODULE GIẢI THÍCH CỤC BỘ LOCAL TOP-3 & KIỂM CHỨNG PARITY
+# =============================================================================
+def compute_local_top3(
+    pipeline: Any,
+    row_features: pd.DataFrame,
+    task: str,
+    target_class_override: Optional[str] = None
+) -> Dict[str, Any]:
+    """Tính giải thích cục bộ Top-3 đặc trưng cho 1 dòng dữ liệu."""
+    if len(row_features) != 1:
+        row_features = row_features.iloc[[0]]
+
+    classifier = pipeline.named_steps.get("classifier", None)
+    if classifier is None:
+        return {"supported": False, "message": "Không tìm thấy classifier step trong pipeline."}
+
+    # Nếu là Random Forest: chưa hỗ trợ pred_contrib
+    if not hasattr(classifier, "booster_"):
+        return {
+            "supported": False,
+            "message": (
+                "Trạng thái giải thích cục bộ: CHƯA HỖ TRỢ đối với mô hình Random Forest. "
+                "Tính năng phân rã đóng góp cục bộ (Local Top-3) hiện chỉ được hỗ trợ trên thuật toán LightGBM "
+                "thông qua cơ chế Tree Booster pred_contrib."
+            )
+        }
+
+    feature_names = list(pipeline.feature_names_in_)
+    classes = list(pipeline.classes_)
+
+    probas = pipeline.predict_proba(row_features)[0]
+    argmax_idx = int(np.argmax(probas))
+    candidate_class = classes[argmax_idx]
+
+    target_class = target_class_override if target_class_override is not None else candidate_class
+    target_class_idx = classes.index(target_class)
+
+    # Tiền xử lý dữ liệu qua fitted preprocessing
+    preprocessor = pipeline.named_steps["preprocessing"]
+    X_transformed = preprocessor.transform(row_features)
+
+    # Tính pred_contrib và raw_score từ booster
+    booster = classifier.booster_
+    raw_scores = booster.predict(X_transformed, raw_score=True)[0]
+    contribs = booster.predict(X_transformed, pred_contrib=True)[0]
+
+    if task == "binary":
+        feat_contribs = contribs[:55].copy()
+        baseline = float(contribs[55])
+        raw_malware = float(raw_scores)
+        if target_class == "Benign":
+            # Đảo dấu cả 55 đóng góp và baseline cho Benign
+            feat_contribs = -feat_contribs
+            baseline = -baseline
+            target_raw_score = -raw_malware
+        else:
+            target_raw_score = raw_malware
+
+    elif task == "multiclass":
+        contribs_matrix = contribs.reshape(len(classes), 56)
+        cls_block = contribs_matrix[target_class_idx]
+        feat_contribs = cls_block[:55].copy()
+        baseline = float(cls_block[55])
+        target_raw_score = float(raw_scores[target_class_idx])
+
+    else:
+        raise ValueError(f"Task không hỗ trợ: '{task}'.")
+
+    # Kiểm chứng parity: sum(contributions) + baseline == raw_score
+    sum_contributions = float(np.sum(feat_contribs))
+    total_reconstructed = sum_contributions + baseline
+    parity_diff = abs(total_reconstructed - target_raw_score)
+    is_parity_ok = parity_diff < 1e-4
+
+    # Xếp hạng Top-3 theo |contrib| giảm dần (sau khi bỏ baseline)
+    orig_values = row_features.iloc[0].values
+    df_contribs = pd.DataFrame({
+        "feature": feature_names,
+        "original_value": orig_values,
+        "contribution": feat_contribs,
+        "abs_contrib": np.abs(feat_contribs)
+    })
+    df_sorted = df_contribs.sort_values(by="abs_contrib", ascending=False).reset_index(drop=True)
+    top3_df = df_sorted.head(3).copy()
+
+    impact_labels = []
+    for c in top3_df["contribution"]:
+        if c > 0:
+            impact_labels.append("Ủng hộ (Tăng xác suất)")
+        elif c < 0:
+            impact_labels.append("Phản đối (Giảm xác suất)")
+        else:
+            impact_labels.append("Trung tính")
+    top3_df["impact"] = impact_labels
+
+    return {
+        "supported": True,
+        "target_class": target_class,
+        "candidate_class": candidate_class,
+        "target_class_idx": target_class_idx,
+        "classes": classes,
+        "probas": probas,
+        "p_max": float(np.max(probas)),
+        "target_raw_score": target_raw_score,
+        "baseline": baseline,
+        "sum_contributions": sum_contributions,
+        "total_reconstructed": total_reconstructed,
+        "parity_diff": parity_diff,
+        "is_parity_ok": is_parity_ok,
+        "top3": top3_df,
+        "all_contributions": df_sorted
+    }
+
+
+# =============================================================================
+# 4. GIAO DIỆN STREAMLIT (UI / UX HIGH-TECH WHITE SOC)
+# =============================================================================
 st.set_page_config(
-    page_title="CIC-MalMem-2022 // CYBER THREAT TRIAGE HUD",
+    page_title="CIC-MalMem-2022 // Memory Forensics Radar",
     page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# -----------------------------------------------------------------------------
-# SVG Icons chuẩn an ninh mạng (Vector sắc nét, độ phân giải cao)
-# -----------------------------------------------------------------------------
-SVG_SHIELD = """<svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L3 6V11.09C3 16.45 6.84 21.49 12 22.82C17.16 21.49 21 16.45 21 11.09V6L12 2Z" fill="#0284c7" fill-opacity="0.15" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 7V17M8 11L12 7L16 11" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>"""
-
-SVG_CHIP = """<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="16" height="16" rx="2" stroke="#0284c7" stroke-width="2" fill="#0284c7" fill-opacity="0.1"/><rect x="8" y="8" width="8" height="8" rx="1" fill="#0284c7"/><path d="M1 9H4M1 15H4M20 9H23M20 15H23M9 1V4M15 1V4M9 20V23M15 20V23" stroke="#0284c7" stroke-width="2" stroke-linecap="round"/></svg>"""
-
-SVG_ANALYTICS = """<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 3V21H21" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 16L12 11L15 14L20 8" stroke="#0284c7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="20" cy="8" r="2" fill="#0284c7"/></svg>"""
-
-SVG_CROSSHAIR = """<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="#0284c7" stroke-width="2"/><circle cx="12" cy="12" r="3" stroke="#0284c7" stroke-width="1.5"/><path d="M12 1V5M12 19V23M1 12H5M19 12H23" stroke="#0284c7" stroke-width="2" stroke-linecap="round"/></svg>"""
-
-SVG_BENIGN_BIG = """<svg width="44" height="44" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L3 6V11.09C3 16.45 6.84 21.49 12 22.82C17.16 21.49 21 16.45 21 11.09V6L12 2Z" fill="#10b981" fill-opacity="0.18" stroke="#10b981" stroke-width="2"/><path d="M9 12L11 14L15 10" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>"""
-
-SVG_THREAT_BIG = """<svg width="44" height="44" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 20H22L12 2Z" fill="#ef4444" fill-opacity="0.18" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 9V14M12 17H12.01" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round"/></svg>"""
-
-SVG_UNCERTAIN_BIG = """<svg width="44" height="44" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" fill="#f59e0b" fill-opacity="0.18" stroke="#f59e0b" stroke-width="2"/><path d="M9.09 9C9.32 8.41 9.77 7.94 10.35 7.69C10.93 7.44 11.59 7.43 12.18 7.66C12.77 7.89 13.24 8.34 13.48 8.92C13.72 9.5 13.69 10.16 13.39 10.72L12 13M12 17H12.01" stroke="#d97706" stroke-width="2.5" stroke-linecap="round"/></svg>"""
-
-# -----------------------------------------------------------------------------
-# CSS Giao diện An ninh mạng (Hỗ trợ 100% tiếng Việt có dấu với Chakra Petch & JetBrains Mono)
-# -----------------------------------------------------------------------------
-st.html("""
+CYBER_CSS = """
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,400;0,500;0,600;0,700;1,500;1,700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
-    /* Nền chung với lưới chấm vi mô công nghệ */
-    .stApp {
-        background-color: #ffffff;
-        background-image: radial-gradient(#e2e8f0 1.1px, transparent 1.1px);
-        background-size: 24px 24px;
-        color: #0f172a;
-        font-family: 'Chakra Petch', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-    }
+html, body, [class*="css"] {
+    font-family: 'Chakra Petch', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #0f172a;
+}
 
-    html, body, [class*="css"] {
-        font-family: 'Chakra Petch', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-    }
+code, pre, .mono-font {
+    font-family: 'JetBrains Mono', monospace !important;
+}
 
-    /* Font Monospace chuẩn cho code, log, dataframe, metrics */
-    code, pre, .stCodeBlock, [data-testid="stMetricValue"] {
-        font-family: 'JetBrains Mono', 'Consolas', monospace !important;
-    }
+.stApp {
+    background-color: #f8fafc;
+    background-image: 
+        radial-gradient(#cbd5e1 1px, transparent 1px),
+        linear-gradient(to right, #f1f5f9 1px, transparent 1px);
+    background-size: 32px 32px;
+}
 
-    /* ---------------- Cyber Hero HUD Banner ---------------- */
-    .cyber-hero-banner {
-        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-        border: 2px solid #0284c7;
-        border-radius: 8px;
-        padding: 22px 28px;
-        margin-bottom: 24px;
-        position: relative;
-        box-shadow: 0 8px 24px rgba(2, 132, 199, 0.1), 0 1px 3px rgba(0, 0, 0, 0.05);
-        overflow: hidden;
-    }
+.cyber-banner {
+    background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 50%, #f0f9ff 100%);
+    border: 1.5px solid #0284c7;
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 20px -2px rgba(2, 132, 199, 0.12);
+    position: relative;
+    overflow: hidden;
+}
 
-    .cyber-hero-banner::before {
-        content: "[TOPIC-05 // CIC-MALMEM-2022 // LEVEL-4 CLASSIFIED]";
-        position: absolute;
-        top: 0;
-        right: 0;
-        background: #0284c7;
-        color: #ffffff;
-        font-family: 'Space Mono', 'JetBrains Mono', monospace !important;
-        font-size: 0.72rem;
-        padding: 3px 14px;
-        letter-spacing: 2px;
-        border-bottom-left-radius: 6px;
-        font-weight: 700;
-    }
+.cyber-banner::before {
+    content: "[TOPIC-05 // CIC-MALMEM-2022 // FORENSIC TELEMETRY CONSOLE]";
+    position: absolute;
+    top: 6px;
+    right: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: #0284c7;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+}
 
-    .hero-flex {
-        display: flex;
-        align-items: center;
-        gap: 20px;
-    }
+.cyber-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: #0f172a;
+    margin: 4px 0 6px 0;
+    text-transform: uppercase;
+}
 
-    .hero-icon-box {
-        background: #f0f9ff;
-        border: 2px solid #38bdf8;
-        border-radius: 10px;
-        padding: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
-    }
+.cyber-subtitle {
+    font-size: 0.95rem;
+    color: #475569;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
 
-    .cyber-title {
-        font-family: 'Chakra Petch', sans-serif !important;
-        font-size: 2.1rem;
-        font-weight: 700;
-        color: #0f172a;
-        letter-spacing: 1.2px;
-        margin: 0;
-        text-transform: uppercase;
-    }
+.cyber-badges {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
 
-    .cyber-subtitle {
-        font-family: 'JetBrains Mono', 'Chakra Petch', monospace !important;
-        font-size: 0.88rem;
-        color: #475569;
-        margin-top: 6px;
-        margin-bottom: 12px;
-        line-height: 1.5;
-    }
+.cyber-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    display: inline-flex;
+    align-items: center;
+}
 
-    /* Badges trạng thái */
-    .cyber-badges {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
+.badge-radar { background: #ecfdf5; color: #047857; border: 1px solid #10b981; }
+.badge-core { background: #f0f9ff; color: #0369a1; border: 1px solid #0284c7; }
+.badge-tau { background: #fefce8; color: #b45309; border: 1px solid #f59e0b; }
+.badge-task { background: #f5f3ff; color: #6d28d9; border: 1px solid #8b5cf6; }
 
-    .cyber-badge {
-        font-family: 'JetBrains Mono', 'Chakra Petch', monospace !important;
-        font-size: 0.78rem;
-        padding: 5px 12px;
-        border-radius: 4px;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-        font-weight: 700;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-    }
+.cyber-card {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px -1px rgba(0, 0, 0, 0.05);
+}
 
-    .badge-radar {
-        background: #ecfdf5;
-        color: #059669;
-        border: 1px solid #10b981;
-        box-shadow: 0 2px 6px rgba(16, 185, 129, 0.15);
-    }
+.cyber-section-header {
+    border-left: 4px solid #0284c7;
+    padding-left: 12px;
+    margin: 20px 0 12px 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: 0.8px;
+}
 
-    .badge-hash {
-        background: #f0f9ff;
-        color: #0284c7;
-        border: 1px solid #0284c7;
-        box-shadow: 0 2px 6px rgba(2, 132, 199, 0.15);
-    }
-
-    .badge-tau {
-        background: #fffbeb;
-        color: #b45309;
-        border: 1px solid #f59e0b;
-        box-shadow: 0 2px 6px rgba(245, 158, 11, 0.15);
-    }
-
-    .badge-core {
-        background: #faf5ff;
-        color: #7e22ce;
-        border: 1px solid #a855f7;
-        box-shadow: 0 2px 6px rgba(168, 85, 247, 0.15);
-    }
-
-    /* ---------------- Cyber Section Titles có Khung Viền Nổi Bật ---------------- */
-    .cyber-section-header {
-        background: #ffffff;
-        border: 1.5px solid #0284c7;
-        border-left: 8px solid #0284c7;
-        border-radius: 6px;
-        padding: 10px 16px;
-        margin-top: 24px;
-        margin-bottom: 16px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        box-shadow: 0 3px 10px rgba(2, 132, 199, 0.08);
-    }
-
-    .cyber-section-title-wrap {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-
-    .cyber-section-icon {
-        background: #f0f9ff;
-        border: 1px solid #bae6fd;
-        border-radius: 6px;
-        padding: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .cyber-section-title {
-        font-family: 'Chakra Petch', sans-serif !important;
-        font-size: 1.25rem;
-        font-weight: 700;
-        color: #0f172a;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-        margin: 0;
-    }
-
-    .cyber-section-tag {
-        font-family: 'Space Mono', 'JetBrains Mono', monospace !important;
-        font-size: 0.74rem;
-        color: #0284c7;
-        background: #e0f2fe;
-        border: 1px solid #7dd3fc;
-        padding: 3px 10px;
-        border-radius: 3px;
-        letter-spacing: 1.5px;
-        font-weight: 700;
-    }
-
-    /* ---------------- Metric Cards HUD ---------------- */
-    .cyber-metric-card {
-        background: #ffffff;
-        border: 1.5px solid #cbd5e1;
-        border-top: 4px solid #0284c7;
-        border-radius: 6px;
-        padding: 14px 18px;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
-        position: relative;
-    }
-
-    .cyber-metric-label {
-        font-family: 'Chakra Petch', sans-serif !important;
-        font-size: 0.8rem;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 1.2px;
-        font-weight: 600;
-        margin-bottom: 6px;
-    }
-
-    .cyber-metric-value {
-        font-family: 'JetBrains Mono', monospace !important;
-        font-size: 2rem;
-        font-weight: 700;
-        color: #0f172a;
-        margin: 0;
-    }
-
-    /* ---------------- Decision Cards ---------------- */
-    .cyber-card-decision {
-        border-radius: 8px;
-        padding: 20px 24px;
-        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
-        display: flex;
-        align-items: flex-start;
-        gap: 18px;
-    }
-
-    .decision-accepted {
-        background: #f0fdf4;
-        border: 2px solid #10b981;
-        border-left: 8px solid #059669;
-    }
-
-    .decision-uncertain {
-        background: #fffbeb;
-        border: 2px solid #f59e0b;
-        border-left: 8px solid #d97706;
-    }
-
-    .decision-threat {
-        background: #fef2f2;
-        border: 2px solid #ef4444;
-        border-left: 8px solid #dc2626;
-    }
-
-    /* ---------------- Cryptographic Terminal Box ---------------- */
-    .cyber-terminal-box {
-        background: #090d16;
-        border: 1.5px solid #1e293b;
-        border-left: 6px solid #0284c7;
-        border-radius: 6px;
-        padding: 18px 22px;
-        font-family: 'JetBrains Mono', monospace !important;
-        color: #38bdf8;
-        font-size: 0.88rem;
-        line-height: 1.65;
-        box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.8), 0 4px 14px rgba(15, 23, 42, 0.1);
-    }
-
-    /* Sidebar HUD Styling */
-    [data-testid="stSidebar"] {
-        background-color: #f8fafc;
-        border-right: 1.5px solid #cbd5e1;
-    }
+.metric-box {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-top: 3px solid #0284c7;
+    border-radius: 6px;
+    padding: 14px 18px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.metric-box-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.2;
+}
+.metric-box-lbl {
+    font-size: 0.8rem;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-top: 4px;
+}
 </style>
-""")
+"""
+st.html(CYBER_CSS)
 
 
-@st.cache_resource(show_spinner="[SECURITY INIT] Đang nạp pipeline và xác thực tính toàn vẹn SHA-256...")
-def get_model_and_config(task: str):
-    """Nạp và kiểm tra SHA-256 + classes của model (cached)."""
-    cfg = load_operating_config()
-    pipe, model_info = load_pipeline_for_task(task, cfg)
-    return pipe, model_info, cfg
+@st.cache_resource
+def get_cached_pipeline(model_id: str):
+    """Nạp và cache model pipeline."""
+    cfg = load_inference_config()
+    return load_pipeline_for_model(model_id, cfg)
 
 
-def main():
-    # ---------------------------------------------------- 0. Cyber Hero Header
-    st.html(f"""
-    <div class="cyber-hero-banner">
-        <div class="hero-flex">
-            <div class="hero-icon-box">
-                {SVG_SHIELD}
-            </div>
-            <div>
-                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #0284c7; letter-spacing: 2.5px; font-weight: 700;">
-                    [DEFENSE PROTOCOL // FORENSIC MEMORY ANALYSIS]
-                </div>
-                <h1 class="cyber-title">CIC-MALMEM-2022 // THREAT TELEMETRY CONSOLE</h1>
-                <div class="cyber-subtitle">
-                    HỆ THỐNG ĐIỀU TRA & GIÁM SÁT MÃ ĐỘC TỪ DẤU VẾT BỘ NHỚ RAM (55 FEATURES) //
-                    CƠ CHẾ TỪ CHỐI UNCERTAIN (&tau; = 0.65) // GIẢI THÍCH LOCAL TOP-3
-                </div>
-                <div class="cyber-badges">
-                    <span class="cyber-badge badge-radar">● SOC RADAR: ONLINE</span>
-                    <span class="cyber-badge badge-hash">HASH SHA-256: VERIFIED</span>
-                    <span class="cyber-badge badge-tau">CUTOFF: TAU = 0.65</span>
-                    <span class="cyber-badge badge-core">CORE: LIGHTGBM [LOCKED]</span>
-                </div>
-            </div>
-        </div>
-    </div>
-    """)
+# Nạp cấu hình toàn cục
+config = load_inference_config()
+model_report = load_model_report()
 
-    # ---------------------------------------------------- Sidebar Cyber Panel
-    with st.sidebar:
-        st.html("""
-        <div style="background: #ffffff; border: 1.5px solid #0284c7; border-left: 5px solid #0284c7; border-radius: 5px; padding: 8px 12px; margin-bottom: 16px;">
-            <div style="font-family: 'Chakra Petch', sans-serif; font-weight: 700; font-size: 0.95rem; color: #0f172a; text-transform: uppercase;">
-                🎛️ BẢNG ĐIỀU KHIỂN TÁC VỤ
-            </div>
-            <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #0284c7; letter-spacing: 1px;">
-                [TASK CONFIGURATION]
-            </div>
-        </div>
-        """)
 
-        task_choice = st.radio(
-            "Chọn chế độ điều tra (Investigation Mode):",
-            options=["Task A (Binary Triage)", "Task B (Multiclass Threat Family)"],
-            index=0,
-            help="Task A: Benign vs Malware. Task B: Benign vs Ransomware / Spyware / Trojan."
-        )
-        task_key = "binary" if "Task A" in task_choice else "multiclass"
+# =============================================================================
+# 5. SIDEBAR: ĐIỀU KHIỂN & LỰA CHỌN 4 MODELS
+# =============================================================================
+st.sidebar.markdown("### 🎛️ ĐIỀU KHIỂN & CẤU HÌNH TÁC VỤ")
 
-        try:
-            pipeline, model_info, config = get_model_and_config(task_key)
-            tau = float(config.get("tau", 0.65))
-            rejection_label = config.get("rejection_label", "Uncertain")
-        except Exception as e:
-            st.error(f"[SYSTEM_FAULT] Không thể nạp mô hình: {e}")
-            st.stop()
+task_choice = st.sidebar.radio(
+    "1. Chọn nhiệm vụ điều tra (Investigation Task):",
+    options=["Task A (Binary Triage)", "Task B (Multiclass Threat Family)"],
+    index=0
+)
+task_key = "binary" if "Binary" in task_choice else "multiclass"
 
-        st.markdown("---")
-        st.html("""
-        <div style="background: #ffffff; border: 1px solid #cbd5e1; border-left: 4px solid #475569; border-radius: 5px; padding: 8px 12px; margin-bottom: 12px;">
-            <div style="font-family: 'Chakra Petch', sans-serif; font-weight: 700; font-size: 0.9rem; color: #0f172a;">
-                🛡️ THÔNG SỐ PIPELINE KHÓA
-            </div>
-            <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #64748b;">
-                [LOCKED RUN PARAMETERS]
-            </div>
-        </div>
-        """)
+algo_choice = st.sidebar.radio(
+    "2. Chọn thuật toán phân loại (Algorithm Core):",
+    options=["LightGBM (Mặc định // Primary)", "Random Forest (Tùy chọn // Secondary)"],
+    index=0
+)
+algo_key = "lightgbm" if "LightGBM" in algo_choice else "random_forest"
 
-        st.markdown(f"- **Thuật toán lõi:** `{model_info.get('algorithm', 'lightgbm').upper()}`")
-        st.markdown(f"- **Run ID:** `{model_info.get('run_id')}`")
-        st.markdown(f"- **Ngưỡng $\\tau$ (tau):** `{tau:.2f}`")
-        st.markdown(f"- **Nhãn từ chối:** `{rejection_label}`")
-        st.markdown(f"- **Số features yêu cầu:** `{len(pipeline.feature_names_in_)}`")
-        st.markdown(f"- **Classes:** `{', '.join(pipeline.classes_)}`")
-        st.caption(f"SHA-256: `{model_info.get('pipeline_sha256')[:16]}...` (đã đối chiếu khớp)")
+# Ánh xạ model ID tương ứng
+if task_key == "binary":
+    selected_model_id = "02_binary_lightgbm" if algo_key == "lightgbm" else "01_binary_random_forest"
+else:
+    selected_model_id = "04_multiclass_lightgbm" if algo_key == "lightgbm" else "03_multiclass_random_forest"
 
-        st.markdown("---")
-        st.html("""
-        <div style="background: #ffffff; border: 1px solid #cbd5e1; border-left: 4px solid #f59e0b; border-radius: 5px; padding: 8px 12px; margin-bottom: 12px;">
-            <div style="font-family: 'Chakra Petch', sans-serif; font-weight: 700; font-size: 0.9rem; color: #0f172a;">
-                ⚡ TẢI NHANH MẪU ĐỐI SOÁT
-            </div>
-            <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: #b45309;">
-                [VALIDATION TELEMETRY]
-            </div>
-        </div>
-        """)
-
-        demo_path = get_project_root() / "demo_validation_features.csv"
-        has_demo = demo_path.exists()
-        use_demo = st.button("🧪 NẠP 3 DÒNG MẪU VALIDATION", disabled=not has_demo, use_container_width=True)
-        if not has_demo:
-            st.caption("Chưa có demo_validation_features.csv tại thư mục gốc.")
-
-    # ---------------------------------------------------- 1. Data Ingestion Header
-    st.html(f"""
-    <div class="cyber-section-header">
-        <div class="cyber-section-title-wrap">
-            <div class="cyber-section-icon">
-                {SVG_CHIP}
-            </div>
-            <h2 class="cyber-section-title">1. NẠP DỮ LIỆU ĐẶC TRƯNG BỘ NHỚ (55 MEMORY VECTORS)</h2>
-        </div>
-        <div class="cyber-section-tag">// STAGE: 01_INGESTION //</div>
-    </div>
-    """)
-
-    uploaded_file = st.file_uploader(
-        "Tải lên tệp CSV chứa các đặc trưng bộ nhớ từ Volatility (55 features hoặc file gốc Obfuscated-MalMem2022.csv)",
-        type=["csv"],
-        help="Hệ thống hỗ trợ cả file 55 features thuần túy lẫn file gốc chứa các cột nhãn Ground-Truth (Class, Category)."
-    )
-
-    auto_drop_labels = st.checkbox(
-        "🛡️ Tự động nhận diện và lọc bỏ cột nhãn Ground-Truth (Class, Category) nếu phát hiện trong file tải lên",
-        value=True,
-        help="Bật tùy chọn này để nạp thẳng file gốc Obfuscated-MalMem2022.csv. Hệ thống sẽ tự động tách 2 cột nhãn Class và Category để trích xuất đúng 55 đặc trưng nạp vào pipeline."
-    )
-
-    input_data = None
-    source_name = ""
-
-    if use_demo and has_demo:
-        input_data = demo_path.read_text(encoding="utf-8")
-        source_name = "demo_validation_features.csv (Row ID 14627, 11611, 43302)"
-        st.info(f"⚡ [TELEMETRY_LOADED] Đang sử dụng dữ liệu mẫu kiểm chứng: **{source_name}**")
-    elif uploaded_file is not None:
-        input_data = uploaded_file.getvalue()
-        source_name = uploaded_file.name
-
-    if input_data is None:
-        st.html("""
-        <div style="background: #ffffff; border: 1.5px dashed #0284c7; border-radius: 8px; padding: 26px; text-align: center; color: #475569; font-family: 'JetBrains Mono', monospace; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.05);">
-            <div style="font-size: 1.05rem; font-weight: 700; color: #0284c7; margin-bottom: 6px;">[STANDBY // WAITING FOR TELEMETRY INPUT]</div>
-            Vui lòng tải file CSV hoặc nhấn nút <b>"NẠP 3 DÒNG MẪU VALIDATION"</b> ở bảng điều khiển bên trái để bắt đầu trích xuất & suy luận.
-        </div>
-        """)
-        return
-
-    # Xác thực dữ liệu
+try:
+    pipeline, model_info = get_cached_pipeline(selected_model_id)
+    tau_value = float(model_info["tau"])
+    rejection_label = config.get("uncertain_label", "Uncertain")
     expected_features = list(pipeline.feature_names_in_)
-    try:
-        X_validated = validate_csv_input(input_data, expected_features, auto_drop_labels=auto_drop_labels)
-    except ValueError as ve:
-        st.error(f"🚨 **[DATA CONTRACT VIOLATION] Xác thực thất bại:** {ve}")
-        st.markdown("""
-        > [!IMPORTANT]
-        > **Quy chuẩn hợp đồng dữ liệu Volatility (55 features):**
-        > - Đúng 55 đặc trưng số đã trích xuất từ RAM dump.
-        > - Tuyệt đối không chứa cột nhãn (`Class`, `Category`, `Filename`, `row_index`, `group_id`) trừ khi bật tùy chọn tự động lọc bỏ.
-        > - Không có cột trùng lặp, chữ rác không phải số, hoặc giá trị vô cực (`inf`).
-        > - Cho phép cột đảo thứ tự (hệ thống sẽ tự động reorder theo đúng pipeline).
-        """)
-        return
-    except Exception as ex:
-        st.error(f"🚨 **[UNEXPECTED_ERROR] Lỗi đọc dữ liệu:** {ex}")
-        return
+    pipeline_classes = list(pipeline.classes_)
+except Exception as e:
+    st.sidebar.error(f"Lỗi khi nạp model {selected_model_id}: {e}")
+    st.stop()
 
-    st.success(f"✅ [INTEGRITY_OK] Xác thực hợp lệ! Đã nhận diện **{len(X_validated):,} mẫu bộ nhớ** với đủ 55 features theo thứ tự pipeline.")
+# Hiển thị thông số model
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🔒 THÔNG SỐ MODEL ĐANG CHẠY")
+sidebar_info_html = f"""
+<div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px 14px; font-size: 0.85rem; line-height: 1.6;">
+    <div><b>Model ID:</b> <code style="color: #0284c7; font-weight: bold;">{selected_model_id}</code></div>
+    <div><b>Thuật toán:</b> <span style="font-weight: 600;">{'LightGBM' if algo_key == 'lightgbm' else 'Random Forest'}</span></div>
+    <div><b>Nhiệm vụ:</b> <span>{'Nhị phân (Binary)' if task_key == 'binary' else 'Đa lớp (Multiclass)'}</span></div>
+    <div><b>Ngưỡng từ chối τ:</b> <code style="background: #fefce8; color: #b45309; padding: 2px 6px; border-radius: 4px; font-weight: bold;">{tau_value:.2f}</code></div>
+    <div><b>Nhãn từ chối:</b> <span style="font-weight: 600; color: #b45309;">{rejection_label}</span></div>
+    <div><b>Số features yêu cầu:</b> <code style="font-weight: bold;">{len(expected_features)}</code></div>
+    <div><b>Tập classes:</b> <span style="color: #475569;">{', '.join(pipeline_classes)}</span></div>
+</div>
+"""
+st.sidebar.html(sidebar_info_html)
 
-    # ---------------------------------------------------- 2. Batch Inference
-    st.html(f"""
-    <div class="cyber-section-header">
-        <div class="cyber-section-title-wrap">
-            <div class="cyber-section-icon">
-                {SVG_ANALYTICS}
-            </div>
-            <h2 class="cyber-section-title">2. BẢNG PHÂN LOẠI & GIÁM SÁT MÃ ĐỘC (BATCH TELEMETRY)</h2>
+if selected_model_id in model_report:
+    rep_item = model_report[selected_model_id]
+    test_metrics = rep_item.get("test", {})
+    at_tau = test_metrics.get("at_selected_tau", {})
+    acc_all = test_metrics.get("accuracy", 0.0)
+    macro_f1 = test_metrics.get("classification_report", {}).get("macro avg", {}).get("f1-score", 0.0)
+    cov = at_tau.get("coverage", 0.0)
+    acc_acc = at_tau.get("accepted_accuracy", 0.0)
+    unc_count = test_metrics.get("uncertain", 0)
+
+    rep_html = f"""
+    <div style="margin-top: 10px; background: #f8fafc; border: 1px dashed #94a3b8; border-radius: 6px; padding: 10px 12px; font-size: 0.8rem;">
+        <div style="font-weight: 700; color: #334155; margin-bottom: 4px; text-transform: uppercase;">📊 Chuẩn Test (8.791 dòng)</div>
+        <div>• Accuracy toàn test: <b>{acc_all*100:.2f}%</b></div>
+        <div>• Macro-F1: <b>{macro_f1:.4f}</b></div>
+        <div>• Coverage (τ={tau_value}): <b>{cov*100:.2f}%</b></div>
+        <div>• Accuracy trên mẫu nhận: <b>{acc_acc*100:.2f}%</b></div>
+        <div>• Số ca Uncertain: <b>{unc_count:,}</b></div>
+    </div>
+    """
+    st.sidebar.html(rep_html)
+
+# Nút nạp nhanh mẫu
+st.sidebar.markdown("---")
+st.sidebar.markdown("### ⚡ TẢI NHANH MẪU KIỂM THỬ")
+
+if "demo_source" not in st.session_state:
+    st.session_state.demo_source = None
+
+col_s1, col_s2 = st.sidebar.columns(2)
+with col_s1:
+    if st.button("🚀 Nạp 5 mẫu chuẩn"):
+        demo_55_path = ROOT_DIR / "data" / "demo" / "demo_validation_55features.csv"
+        if demo_55_path.exists():
+            st.session_state.demo_source = demo_55_path.read_bytes()
+            st.session_state.demo_name = "demo_validation_55features.csv"
+            st.rerun()
+
+with col_s2:
+    if st.button("🏷️ Mẫu kèm nhãn thô"):
+        raw_demo_path = ROOT_DIR / "data" / "demo" / "demo_with_groundtruth_labels.csv"
+        if raw_demo_path.exists():
+            st.session_state.demo_source = raw_demo_path.read_bytes()
+            st.session_state.demo_name = "demo_with_groundtruth_labels.csv"
+            st.rerun()
+
+if st.session_state.demo_source is not None:
+    if st.sidebar.button("🧹 Xóa mẫu / Dùng tệp tải lên"):
+        st.session_state.demo_source = None
+        st.session_state.demo_name = None
+        st.rerun()
+
+
+# =============================================================================
+# 6. THÂN TRANG WEB CHÍNH
+# =============================================================================
+banner_html = f"""
+<div class="cyber-banner">
+    <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #0284c7; letter-spacing: 2px; font-weight: 700;">
+        [DEFENSE PROTOCOL // FORENSIC MEMORY ANALYSIS CONSOLE]
+    </div>
+    <h1 class="cyber-title">CIC-MALMEM-2022 // THREAT TELEMETRY CONSOLE</h1>
+    <div class="cyber-subtitle">
+        HỆ THỐNG ĐIỀU TRA & GIÁM SÁT MÃ ĐỘC TỪ DẤU VẾT BỘ NHỚ RAM (55 FEATURES) // CƠ CHẾ TỪ CHỐI UNCERTAIN (τ = {tau_value:.2f}) // GIẢI THÍCH LOCAL TOP-3
+    </div>
+    <div class="cyber-badges">
+        <span class="cyber-badge badge-radar">● RADAR: ONLINE</span>
+        <span class="cyber-badge badge-core">ENGINE: {algo_key.upper()} [{selected_model_id}]</span>
+        <span class="cyber-badge badge-task">TASK: {task_key.upper()}</span>
+        <span class="cyber-badge badge-tau">CUTOFF TAU: {tau_value:.2f}</span>
+    </div>
+</div>
+"""
+st.html(banner_html)
+
+
+# PHẦN 1: NẠP DỮ LIỆU
+st.markdown('<div class="cyber-section-header">1. NẠP DỮ LIỆU ĐẶC TRƯNG BỘ NHỚ (55 MEMORY VECTORS)</div>', unsafe_allow_html=True)
+
+col_up, col_opt = st.columns([3, 1])
+with col_up:
+    uploaded_file = st.file_uploader(
+        "Tải lên tệp CSV chứa đúng 55 đặc trưng bộ nhớ từ Volatility (hoặc tệp thô từ CIC-MalMem-2022):",
+        type=["csv"],
+        key="main_csv_uploader"
+    )
+
+with col_opt:
+    auto_drop = st.checkbox("Tự động loại bỏ cột nhãn / metadata", value=True)
+
+raw_data_input = None
+source_label = ""
+if uploaded_file is not None:
+    raw_data_input = uploaded_file
+    source_label = f"Tệp tải lên: {uploaded_file.name}"
+elif st.session_state.demo_source is not None:
+    raw_data_input = st.session_state.demo_source
+    source_label = f"Mẫu kiểm thử nạp sẵn: {st.session_state.get('demo_name', 'demo.csv')}"
+
+if raw_data_input is None:
+    contract_guide_html = """
+    <div class="cyber-card" style="border-left: 4px solid #0284c7;">
+        <div style="font-weight: 700; font-size: 0.95rem; color: #0f172a; margin-bottom: 6px;">
+            📋 HỢP ĐỒNG DỮ LIỆU ĐẦU VÀO (VOLATILITY 55 FEATURES CONTRACT)
         </div>
-        <div class="cyber-section-tag">// STAGE: 02_CLASSIFICATION //</div>
+        <ul style="font-size: 0.88rem; color: #475569; margin: 0; padding-left: 20px; line-height: 1.6;">
+            <li><b>Header:</b> Tệp CSV phải có dòng tiêu đề và không được chứa tên cột trùng lặp.</li>
+            <li><b>Số lượng đặc trưng:</b> Đúng <b>55 features số</b> tương ứng các trích xuất Volatility (pslist, dlllist, handles, ldrmodules, malfind, svcscan, callbacks...).</li>
+            <li><b>Cột nhãn / Metadata:</b> Khi bật tùy chọn tự động loại bỏ, hệ thống sẽ tự động gạt bỏ các cột <code style="color: #0284c7;">Class</code>, <code style="color: #0284c7;">Category</code>, <code style="color: #0284c7;">multiclass</code> để tránh data leakage.</li>
+            <li><b>Ô trống (Missing values):</b> Được giữ nguyên dưới dạng NaN để <code>SimpleImputer(strategy='median')</code> trong pipeline tự động bù đắp.</li>
+            <li><b>Xác thực nghiêm ngặt:</b> Phát hiện và từ chối các tệp rỗng, chứa chữ rác (non-numeric text) hoặc giá trị vô cực (<code>inf</code>).</li>
+        </ul>
+        <div style="margin-top: 10px; font-size: 0.85rem; color: #0284c7; font-weight: 600;">
+            👉 Mẹo nhanh: Nhấn nút <b>"Nạp 5 mẫu chuẩn"</b> ở thanh bên trái để thử nghiệm ngay lập tức.
+        </div>
+    </div>
+    """
+    st.html(contract_guide_html)
+    st.stop()
+
+try:
+    X_validated = validate_csv_input(
+        raw_data_input,
+        expected_features=expected_features,
+        auto_drop_labels=auto_drop
+    )
+except ValueError as val_err:
+    st.error(f"❌ [DATA CONTRACT VIOLATION] Xác thực dữ liệu thất bại:\n\n{val_err}")
+    st.stop()
+except Exception as err:
+    st.error(f"❌ Lỗi không xác định khi đọc CSV: {err}")
+    st.stop()
+
+num_rows = len(X_validated)
+st.success(f"✅ [DATA CONTRACT VERIFIED] Xác thực thành công {num_rows} dòng dữ liệu theo đúng 55 features của model. ({source_label})")
+
+with st.expander("🔍 Xem bảng dữ liệu 55 đặc trưng đã chuẩn hóa (Tối đa 5 dòng đầu)"):
+    st.dataframe(X_validated.head(5), use_container_width=True)
+
+
+# PHẦN 2: BẢNG KẾT QUẢ SUY LUẬN
+st.markdown('<div class="cyber-section-header">2. BẢNG KẾT QUẢ SUY LUẬN & THỐNG KÊ ĐỘ PHỦ TELEMETRY</div>', unsafe_allow_html=True)
+
+try:
+    results_df, probas = predict_batch(
+        pipeline=pipeline,
+        X_validated=X_validated,
+        tau=tau_value,
+        rejection_label=rejection_label
+    )
+except Exception as pred_err:
+    st.error(f"❌ Lỗi trong quá trình suy luận pipeline: {pred_err}")
+    st.stop()
+
+num_accepted = int((results_df["Kết quả"] != rejection_label).sum())
+num_uncertain = int((results_df["Kết quả"] == rejection_label).sum())
+coverage_pct = (num_accepted / num_rows) * 100.0 if num_rows > 0 else 0.0
+
+col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+with col_m1:
+    st.html(f"""
+    <div class="metric-box">
+        <div class="metric-box-val">{num_rows}</div>
+        <div class="metric-box-lbl">Tổng số mẫu (Total)</div>
+    </div>
+    """)
+with col_m2:
+    st.html(f"""
+    <div class="metric-box" style="border-top-color: #10b981;">
+        <div class="metric-box-val" style="color: #059669;">{num_accepted}</div>
+        <div class="metric-box-lbl">Đạt ngưỡng tin cậy (Accepted)</div>
+    </div>
+    """)
+with col_m3:
+    st.html(f"""
+    <div class="metric-box" style="border-top-color: #f59e0b;">
+        <div class="metric-box-val" style="color: #d97706;">{num_uncertain}</div>
+        <div class="metric-box-lbl">Bị từ chối (Uncertain)</div>
+    </div>
+    """)
+with col_m4:
+    st.html(f"""
+    <div class="metric-box" style="border-top-color: #8b5cf6;">
+        <div class="metric-box-val" style="color: #7c3aed;">{coverage_pct:.1f}%</div>
+        <div class="metric-box-lbl">Độ phủ (Coverage at τ)</div>
     </div>
     """)
 
-    results_df, probas = predict_batch(pipeline, X_validated, tau=tau, rejection_label=rejection_label)
+st.markdown("#### 📋 Chi tiết kết quả suy luận từng dòng:")
 
-    # Thống kê nhanh
-    n_total = len(results_df)
-    n_accepted = int(results_df["Đạt ngưỡng"].sum())
-    n_uncertain = n_total - n_accepted
-    coverage = (n_accepted / n_total) * 100.0
+display_df = results_df.copy()
+display_df["p_max"] = display_df["p_max"].apply(lambda v: f"{v:.4f}")
+for cls in pipeline_classes:
+    col_name = f"Score_{cls}"
+    if col_name in display_df.columns:
+        display_df[col_name] = display_df[col_name].apply(lambda v: f"{v:.4f}")
 
-    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-    with col_m1:
-        st.html(f"""
-        <div class="cyber-metric-card">
-            <div class="cyber-metric-label">TỔNG SỐ MẪU (SAMPLES)</div>
-            <div class="cyber-metric-value">{n_total}</div>
-        </div>
-        """)
-    with col_m2:
-        st.html(f"""
-        <div class="cyber-metric-card" style="border-top-color: #10b981;">
-            <div class="cyber-metric-label" style="color: #059669;">TIẾP NHẬN (ACCEPTED)</div>
-            <div class="cyber-metric-value" style="color: #059669;">{n_accepted}</div>
-        </div>
-        """)
-    with col_m3:
-        st.html(f"""
-        <div class="cyber-metric-card" style="border-top-color: #f59e0b;">
-            <div class="cyber-metric-label" style="color: #d97706;">TỪ CHỐI (UNCERTAIN)</div>
-            <div class="cyber-metric-value" style="color: #d97706;">{n_uncertain}</div>
-        </div>
-        """)
-    with col_m4:
-        st.html(f"""
-        <div class="cyber-metric-card" style="border-top-color: #8b5cf6;">
-            <div class="cyber-metric-label" style="color: #7c3aed;">ĐỘ BAO PHỦ (COVERAGE)</div>
-            <div class="cyber-metric-value" style="color: #7c3aed;">{coverage:.2f}%</div>
-        </div>
-        """)
-
-    st.write("")
-
-    # Hiển thị bảng tổng hợp
-    display_cols = ["Dòng", "Kết quả", "Lớp ứng viên", "p_max", "Ngưỡng tau", "Đạt ngưỡng"]
-    score_cols = [f"Score_{c}" for c in pipeline.classes_]
-    display_df = results_df[display_cols + score_cols].copy()
-
-    # Định dạng số thực
-    format_dict = {"p_max": "{:.6f}"}
-    for sc in score_cols:
-        format_dict[sc] = "{:.6f}"
-
-    def highlight_threat(val):
-        if val == "Uncertain":
-            return "background-color: #fef3c7; color: #b45309; font-weight: 700; border-left: 4px solid #d97706;"
-        elif val == "Benign":
-            return "background-color: #dcfce7; color: #15803d; font-weight: 700; border-left: 4px solid #16a34a;"
-        elif val in ("Malware", "Ransomware", "Spyware", "Trojan"):
-            return "background-color: #fee2e2; color: #b91c1c; font-weight: 700; border-left: 4px solid #dc2626;"
-        return ""
-
-    styler = display_df.style.format(format_dict)
-    if hasattr(styler, "map"):
-        styled_df = styler.map(highlight_threat, subset=["Kết quả"])
+def highlight_results(val):
+    if val == "Benign":
+        return "background-color: #ecfdf5; color: #065f46; font-weight: bold;"
+    elif val == "Uncertain":
+        return "background-color: #fffbeb; color: #92400e; font-weight: bold;"
     else:
-        styled_df = styler.applymap(highlight_threat, subset=["Kết quả"])
+        return "background-color: #fef2f2; color: #991b1b; font-weight: bold;"
 
-    st.dataframe(
-        styled_df,
-        use_container_width=True,
-        height=min(320, 45 + len(display_df) * 36)
+st.dataframe(
+    display_df.style.applymap(highlight_results, subset=["Kết quả"]) if hasattr(display_df.style, "applymap")
+    else display_df.style.map(highlight_results, subset=["Kết quả"]),
+    use_container_width=True,
+    height=min(320, 45 + num_rows * 38)
+)
+
+csv_buffer = io.StringIO()
+results_df.to_csv(csv_buffer, index=False)
+st.download_button(
+    label="📥 Tải xuống CSV kết quả suy luận (Inference Report)",
+    data=csv_buffer.getvalue(),
+    file_name=f"inference_results_{selected_model_id}.csv",
+    mime="text/csv"
+)
+
+
+# PHẦN 3: KHÁM NGHIỆM CHI TIẾT DÒNG
+st.markdown('<div class="cyber-section-header">3. KHÁM NGHIỆM CHI TIẾT DÒNG & GIẢI THÍCH CỤC BỘ (LOCAL TOP-3)</div>', unsafe_allow_html=True)
+
+col_sel, col_stat = st.columns([1, 2])
+with col_sel:
+    selected_row_idx = st.selectbox(
+        "Chọn dòng dữ liệu cần khám nghiệm chi tiết:",
+        options=list(range(num_rows)),
+        format_func=lambda i: f"Dòng #{i} — Kết quả: {results_df.iloc[i]['Kết quả']} (p_max = {results_df.iloc[i]['p_max']:.3f})"
     )
 
-    st.caption(
-        "⚡ Protocol Note: So sánh p_max >= tau (0.65) được thực hiện trên số thực nguyên bản trước khi hiển thị. "
-        "Các cột Score thể hiện điểm dự đoán của model (predict_proba); chưa có bằng chứng đã được hiệu chỉnh (calibrated) "
-        "để xem là xác suất thực tế ngoài phân phối."
-    )
+row_res = results_df.iloc[selected_row_idx]
+row_features = X_validated.iloc[[selected_row_idx]]
+is_accepted = bool(row_res["Đạt ngưỡng"])
+dec_label = row_res["Kết quả"]
+cand_class = row_res["Lớp ứng viên"]
+row_pmax = float(row_res["p_max"])
 
-    # ---------------------------------------------------- 3. Row Details & Explanation
-    st.html(f"""
-    <div class="cyber-section-header">
-        <div class="cyber-section-title-wrap">
-            <div class="cyber-section-icon">
-                {SVG_CROSSHAIR}
-            </div>
-            <h2 class="cyber-section-title">3. SOI CHI TIẾT MẪU & GIẢI THÍCH LOCAL TOP-3 (XAI TELEMETRY)</h2>
+with col_stat:
+    status_bg = "#ecfdf5" if dec_label == "Benign" else ("#fffbeb" if dec_label == rejection_label else "#fef2f2")
+    status_border = "#10b981" if dec_label == "Benign" else ("#f59e0b" if dec_label == rejection_label else "#ef4444")
+    status_text_color = "#065f46" if dec_label == "Benign" else ("#92400e" if dec_label == rejection_label else "#991b1b")
+    status_title = "ĐẠT NGƯỠNG AN TOÀN // TIN CẬY" if is_accepted else f"CẢNH BÁO // TỪ CHỐI DO KHÔNG ĐẠT NGƯỠNG TIN CẬY ({rejection_label.upper()})"
+
+    row_card_html = f"""
+    <div style="background: {status_bg}; border: 1.5px solid {status_border}; border-radius: 6px; padding: 12px 16px;">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: {status_text_color}; font-weight: 700; letter-spacing: 1px;">
+            [TRẠNG THÁI PHÂN ĐỊNH: {status_title}]
         </div>
-        <div class="cyber-section-tag">// STAGE: 03_FORENSIC_XAI //</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: {status_text_color}; margin: 4px 0;">
+            Kết luận: <b>{dec_label}</b> {f"(Lớp ứng viên: <u>{cand_class}</u>)" if not is_accepted else ""}
+        </div>
+        <div style="font-size: 0.85rem; color: #334155;">
+            Điểm tin cậy: <code style="font-weight: bold;">{row_pmax:.4f}</code> | Ngưỡng cắt τ: <code style="font-weight: bold;">{tau_value:.2f}</code> | 
+            Điều kiện: <code>{row_pmax:.4f} {'>=' if is_accepted else '<'} {tau_value:.2f}</code>
+        </div>
     </div>
+    """
+    st.html(row_card_html)
+
+st.markdown("##### 📊 Phân bố điểm xác suất dự đoán (Predicted Class Scores):")
+class_scores = {cls: float(row_res[f"Score_{cls}"]) for cls in pipeline_classes}
+score_df = pd.DataFrame({
+    "Class": list(class_scores.keys()),
+    "Probability": list(class_scores.values())
+})
+
+col_chart, col_chart_info = st.columns([3, 2])
+with col_chart:
+    st.bar_chart(score_df.set_index("Class"), height=180, use_container_width=True)
+with col_chart_info:
+    st.markdown(f"""
+    **Điểm số chi tiết từng lớp:**
+    """ + "".join([f"\n- **{cls}**: `{score_df.loc[score_df['Class'] == cls, 'Probability'].values[0]:.4f}`" for cls in pipeline_classes]) + f"""
+    \n*Ngưỡng quyết định:* $\\tau = {tau_value:.2f}$
     """)
 
-    if len(X_validated) > 500:
-        col_sel1, col_sel2 = st.columns([1.2, 2])
-        with col_sel1:
-            selected_row_idx = st.number_input(
-                f"Nhập số dòng mẫu (0 đến {len(X_validated)-1:,}) để điều tra chi tiết:",
-                min_value=0,
-                max_value=len(X_validated)-1,
-                value=0,
-                step=1,
-                help=f"Tệp lớn ({len(X_validated):,} dòng). Nhập số dòng bất kỳ để nhảy nhanh tới mẫu đó."
-            )
-        with col_sel2:
-            st.html(f"""
-            <div style="margin-top: 24px; padding: 10px 14px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.88rem; color: #0369a1;">
-                Mẫu <b>#{selected_row_idx}</b> ➜ Kết quả: <b>[{results_df.loc[selected_row_idx, 'Kết quả']}]</b> | p_max = <b>{results_df.loc[selected_row_idx, 'p_max']:.6f}</b> | Lớp ứng viên: <b>{results_df.loc[selected_row_idx, 'Lớp ứng viên']}</b>
-            </div>
-            """)
-    else:
-        selected_row_idx = st.selectbox(
-            "Chọn mẫu dòng bộ nhớ để điều tra chi tiết:",
-            options=list(range(len(X_validated))),
-            format_func=lambda i: f"Mẫu #{i} ➜ Kết quả: [{results_df.loc[i, 'Kết quả']}] | p_max = {results_df.loc[i, 'p_max']:.6f} | Lớp ứng viên: {results_df.loc[i, 'Lớp ứng viên']}"
-        )
+# GIẢI THÍCH CỤC BỘ
+st.markdown("##### 🔬 Phân tích giải thích cục bộ (Local Top-3 Feature Attribution):")
 
-    row_data = X_validated.iloc[[selected_row_idx]]
-    row_result = results_df.iloc[selected_row_idx]
-    final_res = row_result["Kết quả"]
-    candidate = row_result["Lớp ứng viên"]
-    p_max_val = row_result["p_max"]
-    is_accepted = bool(row_result["Đạt ngưỡng"])
+explanation_result = compute_local_top3(
+    pipeline=pipeline,
+    row_features=row_features,
+    task=task_key,
+    target_class_override=cand_class
+)
 
-    col_d1, col_d2, col_d3 = st.columns([1.6, 0.9, 1.5])
-    with col_d1:
-        if is_accepted:
-            if final_res == "Benign":
-                st.html(f"""
-                <div class="cyber-card-decision decision-accepted">
-                    <div>{SVG_BENIGN_BIG}</div>
-                    <div>
-                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #059669; letter-spacing: 1.5px; font-weight: 700;">
-                            [STATUS: ACCESS VERIFIED // BENIGN]
-                        </div>
-                        <h3 style="color: #15803d; margin: 4px 0 8px 0; font-size: 1.8rem; font-weight: 700; font-family: 'Chakra Petch', sans-serif;">
-                            KẾT LUẬN: {final_res}
-                        </h3>
-                        <div style="color: #334155; font-family: 'JetBrains Mono', monospace; font-size: 0.88rem; line-height: 1.5;">
-                            Mẫu đạt ngưỡng tin cậy (p_max = <b>{p_max_val:.6f}</b> &ge; &tau; = <b>{tau:.2f}</b>). Dấu vết bộ nhớ an toàn / lành tính.
-                        </div>
-                    </div>
-                </div>
-                """)
-            else:
-                st.html(f"""
-                <div class="cyber-card-decision decision-threat">
-                    <div>{SVG_THREAT_BIG}</div>
-                    <div>
-                        <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #dc2626; letter-spacing: 1.5px; font-weight: 700;">
-                            [CRITICAL ALERT: MALICIOUS ARTIFACT DETECTED]
-                        </div>
-                        <h3 style="color: #b91c1c; margin: 4px 0 8px 0; font-size: 1.8rem; font-weight: 700; font-family: 'Chakra Petch', sans-serif;">
-                            KẾT LUẬN: {final_res}
-                        </h3>
-                        <div style="color: #334155; font-family: 'JetBrains Mono', monospace; font-size: 0.88rem; line-height: 1.5;">
-                            Mẫu đạt ngưỡng tin cậy (p_max = <b>{p_max_val:.6f}</b> &ge; &tau; = <b>{tau:.2f}</b>). Đã định danh hành vi mã độc.
-                        </div>
-                    </div>
-                </div>
-                """)
-        else:
-            st.html(f"""
-            <div class="cyber-card-decision decision-uncertain">
-                <div>{SVG_UNCERTAIN_BIG}</div>
-                <div>
-                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #d97706; letter-spacing: 1.5px; font-weight: 700;">
-                        [WARNING: REJECTION ACTIVATED // UNCERTAIN]
-                    </div>
-                    <h3 style="color: #b45309; margin: 4px 0 8px 0; font-size: 1.8rem; font-weight: 700; font-family: 'Chakra Petch', sans-serif;">
-                        TRẠNG THÁI: {rejection_label}
-                    </h3>
-                    <div style="color: #334155; font-family: 'JetBrains Mono', monospace; font-size: 0.88rem; line-height: 1.5;">
-                        Từ chối quyết định do p_max = <b>{p_max_val:.6f}</b> &lt; &tau; = <b>{tau:.2f}</b>.<br>
-                        👉 <b>Lớp ứng viên (điểm cao nhất):</b> <span style="color: #0284c7; font-size: 1.05rem; font-weight: bold;">{candidate}</span>
-                    </div>
-                </div>
-            </div>
-            """)
-
-    with col_d2:
-        st.html(f"""
-        <div class="cyber-metric-card" style="margin-bottom: 12px;">
-            <div class="cyber-metric-label">ĐIỂM CAO NHẤT (p_max)</div>
-            <div class="cyber-metric-value" style="font-size: 1.5rem; color: #0284c7;">{p_max_val:.6f}</div>
+if not explanation_result["supported"]:
+    rf_notice_html = f"""
+    <div style="background: #f1f5f9; border: 1.5px dashed #64748b; border-radius: 8px; padding: 18px 20px; margin: 12px 0;">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 700; color: #475569; letter-spacing: 1px;">
+            ⚠️ TRẠNG THÁI GIẢI THÍCH CỤC BỘ: CHƯA HỖ TRỢ ĐỐI VỚI RANDOM FOREST
         </div>
-        <div class="cyber-metric-card" style="border-top-color: #ef4444;">
-            <div class="cyber-metric-label">NGƯỠNG QUYẾT ĐỊNH (&tau;)</div>
-            <div class="cyber-metric-value" style="font-size: 1.5rem; color: #ef4444;">{tau:.2f}</div>
+        <div style="font-size: 0.92rem; color: #334155; margin-top: 6px; line-height: 1.5;">
+            {explanation_result['message']}
         </div>
-        """)
-
-    with col_d3:
-        # Biểu đồ phân phối scores trên nền trắng tinh tế
-        fig, ax = plt.subplots(figsize=(5, 2.6), facecolor="#ffffff")
-        ax.set_facecolor("#ffffff")
-
-        class_names = list(pipeline.classes_)
-        scores = [row_result[f"Score_{c}"] for c in class_names]
-
-        # Bảng màu an ninh mạng rõ ràng trên nền sáng
-        color_map = {
-            "Benign": "#10b981",
-            "Malware": "#ef4444",
-            "Ransomware": "#e11d48",
-            "Spyware": "#f59e0b",
-            "Trojan": "#8b5cf6"
-        }
-        bar_colors = [color_map.get(c, "#0284c7") for c in class_names]
-
-        bars = ax.barh(class_names, scores, color=bar_colors, alpha=0.88, edgecolor="none", height=0.55)
-        ax.axvline(tau, color="#dc2626", linestyle="--", linewidth=1.6, label=f"tau = {tau:.2f} [CUTOFF]")
-        ax.set_xlim(0, 1.05)
-
-        # Style trục và grid nền sáng
-        ax.tick_params(colors="#334155", labelsize=8.5)
-        ax.xaxis.label.set_color("#334155")
-        ax.set_xlabel("Scores dự đoán", fontsize=8.5, weight="bold")
-        ax.set_title("PHÂN PHỐI ĐIỂM CÁC LỚP", fontsize=9.5, color="#0f172a", weight="bold")
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.spines["left"].set_color("#cbd5e1")
-        ax.spines["bottom"].set_color("#cbd5e1")
-        ax.grid(axis="x", color="#e2e8f0", linestyle=":", linewidth=0.8)
-        ax.legend(loc="lower right", fontsize=7.5, facecolor="#f8fafc", edgecolor="#cbd5e1", labelcolor="#0f172a")
-
-        plt.tight_layout()
-        st.pyplot(fig)
-        plt.close(fig)
-
-    # ---------------------------------------------------- Local Top-3 Features Explanation
-    st.markdown("#### 🎯 GIẢI THÍCH CỤC BỘ TOP-3 ĐẶC TRƯNG TÁC ĐỘNG CAO NHẤT (PRED_CONTRIB)")
-
-    if not is_accepted:
-        st.html(f"""
-        <div style="background: #fffbeb; border: 1px solid #fde68a; border-left: 5px solid #d97706; padding: 12px 16px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; color: #b45309; font-size: 0.88rem; margin-bottom: 14px;">
-            ⚠️ [CAUTION // UNCERTAIN STATE]: Mẫu chưa đủ độ tin cậy để tiếp nhận. Giải thích dưới đây được tính cho <b>lớp ứng viên [{candidate}]</b> (lớp có điểm cao nhất).
+        <div style="margin-top: 10px; font-size: 0.88rem; color: #0284c7; font-weight: 600;">
+            💡 Gợi ý thao tác: Hãy chọn thuật toán <b>"LightGBM"</b> ở thanh bên trái để xem đầy đủ bảng giải thích Local Top-3 và cơ chế kiểm chứng tính khớp raw margin.
         </div>
-        """)
-    else:
-        st.html(f"""
-        <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-left: 5px solid #0284c7; padding: 12px 16px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; color: #0369a1; font-size: 0.88rem; margin-bottom: 14px;">
-            🔍 [EXPLANATION SCOPE]: Giải thích đóng góp cho lớp được phân loại: <b>[{final_res}]</b>.
+    </div>
+    """
+    st.html(rf_notice_html)
+else:
+    top3_df = explanation_result["top3"]
+    target_cls = explanation_result["target_class"]
+    baseline_val = explanation_result["baseline"]
+    raw_score_val = explanation_result["target_raw_score"]
+    sum_contribs = explanation_result["sum_contributions"]
+    total_recon = explanation_result["total_reconstructed"]
+    parity_diff = explanation_result["parity_diff"]
+    is_ok = explanation_result["is_parity_ok"]
+
+    lgb_info_html = f"""
+    <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 6px; padding: 10px 16px; margin-bottom: 12px; font-size: 0.88rem;">
+        <div><b>Đang giải thích cho lớp:</b> <span style="font-weight: 700; color: #166534;">{target_cls}</span> 
+        {f"(Lớp ứng viên được chọn để phân tích do dòng này bị <i>Uncertain</i>)" if not is_accepted else ""}</div>
+        <div style="color: #475569; font-size: 0.82rem; margin-top: 2px;">
+            Cơ chế: Trích xuất <code>pred_contrib=True</code> từ LightGBM Booster sau khi chuẩn hóa qua pipeline fitted preprocessing.
         </div>
-        """)
+    </div>
+    """
+    st.html(lgb_info_html)
 
-    try:
-        explanation = compute_local_top3(pipeline, row_data, task=task_key)
-        top3_df = explanation["top3"]
-        target_cls = explanation["target_class"]
-        raw_margin = explanation["target_raw_score"]
-        baseline_val = explanation["baseline"]
-        sum_contribs = explanation["sum_contributions"]
-        parity_diff = explanation["parity_diff"]
-        is_parity_ok = explanation["is_parity_ok"]
+    top3_display = pd.DataFrame({
+        "Thứ hạng": [f"Top #{i+1}" for i in range(len(top3_df))],
+        "Đặc trưng bộ nhớ (Feature)": top3_df["feature"],
+        "Giá trị gốc (Raw Value)": top3_df["original_value"].apply(lambda v: f"{v:.4f}" if isinstance(v, (int, float)) else str(v)),
+        "Đóng góp (Signed Raw Score)": top3_df["contribution"].apply(lambda v: f"{v:+.4f}"),
+        "Mức độ ảnh hưởng (|Contrib|)": top3_df["abs_contrib"].apply(lambda v: f"{v:.4f}"),
+        "Hướng tác động": top3_df["impact"]
+    })
+    st.table(top3_display)
 
-        st.caption(
-            f"Đơn vị: **Đóng góp vào raw score (margin) của lớp {target_cls}** từ mô hình LightGBM (pred_contrib)."
-        )
+    parity_status_color = "#047857" if is_ok else "#b91c1c"
+    parity_status_text = "PASS (ĐẠT CHUẨN ĐỘ LỆCH < 1e-4)" if is_ok else "FAIL"
 
-        col_t1, col_t2 = st.columns([1.2, 1])
-        with col_t1:
-            st.markdown("##### Bảng Top-3 Features ảnh hưởng lớn nhất:")
-            table_top3 = top3_df[["feature", "original_value", "contribution"]].copy()
-            table_top3.columns = ["Đặc trưng bộ nhớ (Feature)", "Giá trị gốc (RAM)", "Đóng góp (Contribution)"]
-            table_top3["Chiều hướng"] = table_top3["Đóng góp (Contribution)"].apply(
-                lambda x: "🟢 Thúc đẩy" if x > 0 else "🔴 Kìm hãm"
-            )
-            st.dataframe(
-                table_top3.style.format({
-                    "Giá trị gốc (RAM)": "{:,.4f}",
-                    "Đóng góp (Contribution)": "{:+.6f}"
-                }),
-                use_container_width=True,
-                hide_index=True
-            )
-
-        with col_t2:
-            st.markdown("##### Biểu đồ đóng góp Top-3:")
-            fig2, ax2 = plt.subplots(figsize=(5, 2.5), facecolor="#ffffff")
-            ax2.set_facecolor("#ffffff")
-
-            f_names = top3_df["feature"].tolist()
-            c_vals = top3_df["contribution"].tolist()
-            c_colors = ["#10b981" if v > 0 else "#ef4444" for v in c_vals]
-            y_pos = np.arange(len(f_names))
-
-            ax2.barh(y_pos, c_vals, color=c_colors, alpha=0.88, edgecolor="none", height=0.5)
-            ax2.axvline(0, color="#94a3b8", linewidth=0.8, linestyle="--")
-            ax2.set_yticks(y_pos)
-            ax2.set_yticklabels(f_names, fontsize=8, color="#0f172a", fontfamily="monospace")
-            ax2.invert_yaxis()
-            ax2.tick_params(colors="#334155", labelsize=8)
-            ax2.xaxis.label.set_color("#334155")
-            ax2.set_xlabel("Đóng góp vào raw score", fontsize=8, weight="bold")
-            ax2.spines["top"].set_visible(False)
-            ax2.spines["right"].set_visible(False)
-            ax2.spines["left"].set_color("#cbd5e1")
-            ax2.spines["bottom"].set_color("#cbd5e1")
-            ax2.grid(axis="x", color="#e2e8f0", linestyle=":", linewidth=0.8)
-
-            plt.tight_layout()
-            st.pyplot(fig2)
-            plt.close(fig2)
-
-        # Hộp kiểm chứng độ khớp Raw Score (Cryptographic Parity Log Terminal)
-        with st.expander("🔍 [CRYPTOGRAPHIC PARITY LOG // ĐỐI SOÁT ĐỘ KHỚP RAW SCORE]"):
-            st.html(f"""
-            <div class="cyber-terminal-box">
-                [TELEMETRY AUDIT LOG // PRED_CONTRIB PARITY CHECK]<br>
-                =======================================================<br>
-                &gt;&gt; TARGET CLASS              : {target_cls}<br>
-                &gt;&gt; TARGET RAW MARGIN (LGBM)   : {raw_margin:+.8f}<br>
-                &gt;&gt; MODEL BASELINE BIAS        : {baseline_val:+.8f}<br>
-                &gt;&gt; SUM 55 FEATURE VECTORS    : {sum_contribs:+.8f}<br>
-                &gt;&gt; RECONSTRUCTED RAW MARGIN  : {(sum_contribs + baseline_val):+.8f}<br>
-                &gt;&gt; PARITY DELTA RESIDUAL     : {parity_diff:+.10e}<br>
-                &gt;&gt; AUDIT STATUS              : {'[VERIFIED // EXACT MATCH ✅]' if is_parity_ok else '[PARITY MISMATCH ⚠️]'}<br>
-                =======================================================<br>
-                * Note: Với Binary Benign, toàn bộ 55 đóng góp và baseline được đảo dấu để giải thích margin đối nghịch. Multiclass trích xuất đúng khối lớp ứng viên từ ma trận (4 x 56).
-            </div>
-            """)
-
-    except Exception as e_exp:
-        st.error(f"[EXPLANATION_FAULT] Lỗi khi tính toán giải thích cục bộ: {e_exp}")
+    parity_html = f"""
+    <div style="background: #ffffff; border: 1px solid #cbd5e1; border-top: 3px solid #0284c7; border-radius: 6px; padding: 14px 18px; margin-top: 14px; font-size: 0.85rem;">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 700; color: #0284c7; letter-spacing: 1px;">
+            🔒 KIỂM CHỨNG TÍNH KHỚP TOÀN VẸN (RAW SCORE PARITY VERIFICATION)
+        </div>
+        <div style="margin-top: 8px; line-height: 1.7; font-family: 'JetBrains Mono', monospace; color: #334155;">
+            <div>• Tổng 55 đặc trưng (Σ Contrib): <b>{sum_contribs:+.6f}</b></div>
+            <div>• Điểm nền cơ sở (Baseline / Prior): <b>{baseline_val:+.6f}</b></div>
+            <div>• Tổng tái tạo (Σ Contrib + Baseline): <b>{total_recon:+.6f}</b></div>
+            <div>• Điểm biên thô gốc (Target Raw Score): <b>{raw_score_val:+.6f}</b></div>
+            <div>• Chênh lệch sai số (|Δ|): <b>{parity_diff:.2e}</b></div>
+            <div>• Trạng thái kiểm chứng: <span style="font-weight: 700; color: {parity_status_color}; background: #ecfdf5; padding: 2px 8px; border-radius: 4px;">{parity_status_text}</span></div>
+        </div>
+    </div>
+    """
+    st.html(parity_html)
 
 
-if __name__ == "__main__":
-    main()
+st.markdown("---")
+footer_html = """
+<div style="text-align: center; color: #64748b; font-size: 0.8rem; font-family: 'JetBrains Mono', monospace; padding: 10px 0;">
+    TOPIC 05 — CIC-MALMEM-2022 // OBFUSCATED MALWARE DETECTION FROM MEMORY FORENSICS<br>
+    Triển khai Streamlit Web Demo cục bộ theo quy chuẩn bàn giao TV5 // Phiên bản 2.0 (4 Models Architecture)
+</div>
+"""
+st.html(footer_html)

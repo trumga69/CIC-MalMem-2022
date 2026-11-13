@@ -1,0 +1,1936 @@
+{
+  "01_binary_random_forest": {
+    "algorithm": "random_forest",
+    "classes": [
+      "Benign",
+      "Malware"
+    ],
+    "classifier_params": {
+      "bootstrap": true,
+      "ccp_alpha": 0.0,
+      "class_weight": null,
+      "criterion": "gini",
+      "max_depth": null,
+      "max_features": "sqrt",
+      "max_leaf_nodes": null,
+      "max_samples": null,
+      "min_impurity_decrease": 0.0,
+      "min_samples_leaf": 1,
+      "min_samples_split": 2,
+      "min_weight_fraction_leaf": 0.0,
+      "monotonic_cst": null,
+      "n_estimators": 100,
+      "n_jobs": -1,
+      "oob_score": false,
+      "random_state": 42,
+      "verbose": 0,
+      "warm_start": false
+    },
+    "feature_count": 55,
+    "selected_config": "rf_100_dNone",
+    "task": "binary",
+    "tau": 0.95,
+    "test": {
+      "accuracy": 0.9995449891934933,
+      "at_selected_tau": {
+        "accepted": 8750,
+        "accepted_accuracy": 1.0,
+        "coverage": 0.9953361392333068,
+        "tau": 0.95
+      },
+      "at_selected_tau_by_class": {
+        "Benign": {
+          "accepted": 4387,
+          "accepted_accuracy": 1.0,
+          "coverage": 0.9981797497155859,
+          "support": 4395
+        },
+        "Malware": {
+          "accepted": 4363,
+          "accepted_accuracy": 1.0,
+          "coverage": 0.9924931756141947,
+          "support": 4396
+        }
+      },
+      "classification_report": {
+        "Benign": {
+          "f1-score": 0.9995450409463148,
+          "precision": 0.9993177166249716,
+          "recall": 0.9997724687144482,
+          "support": 4395.0
+        },
+        "Malware": {
+          "f1-score": 0.9995449374288965,
+          "precision": 0.9997724169321802,
+          "recall": 0.9993175614194723,
+          "support": 4396.0
+        },
+        "accuracy": 0.9995449891934933,
+        "macro avg": {
+          "f1-score": 0.9995449891876056,
+          "precision": 0.9995450667785759,
+          "recall": 0.9995450150669603,
+          "support": 8791.0
+        },
+        "weighted avg": {
+          "f1-score": 0.999544989181718,
+          "precision": 0.9995450926402701,
+          "recall": 0.9995449891934933,
+          "support": 8791.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          4394,
+          1
+        ],
+        [
+          3,
+          4393
+        ]
+      ],
+      "rows": 8791,
+      "uncertain": 41
+    },
+    "validation": {
+      "at_selected_tau": {
+        "accepted": 8765,
+        "accepted_accuracy": 1.0,
+        "coverage": 0.9969290263876252,
+        "tau": 0.95
+      },
+      "classification_report": {
+        "Benign": {
+          "f1-score": 0.999090702432371,
+          "precision": 0.9981830570065864,
+          "recall": 1.0,
+          "support": 4395.0
+        },
+        "Malware": {
+          "f1-score": 0.9990894605053494,
+          "precision": 1.0,
+          "recall": 0.9981805776665909,
+          "support": 4397.0
+        },
+        "accuracy": 0.9990900818926297,
+        "macro avg": {
+          "f1-score": 0.9990900814688601,
+          "precision": 0.9990915285032932,
+          "recall": 0.9990902888332954,
+          "support": 8792.0
+        },
+        "weighted avg": {
+          "f1-score": 0.9990900813276038,
+          "precision": 0.9990917351619594,
+          "recall": 0.9990900818926297,
+          "support": 8792.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          4395,
+          0
+        ],
+        [
+          8,
+          4389
+        ]
+      ],
+      "feature_importance": [
+        {
+          "feature": "svcscan.nservices",
+          "importance": 0.14732710091590603
+        },
+        {
+          "feature": "svcscan.kernel_drivers",
+          "importance": 0.1448933490302844
+        },
+        {
+          "feature": "dlllist.avg_dlls_per_proc",
+          "importance": 0.11566181161129416
+        },
+        {
+          "feature": "svcscan.shared_process_services",
+          "importance": 0.10485631492595328
+        },
+        {
+          "feature": "handles.avg_handles_per_proc",
+          "importance": 0.06940418592637854
+        },
+        {
+          "feature": "handles.nsection",
+          "importance": 0.06774672495813591
+        },
+        {
+          "feature": "handles.nevent",
+          "importance": 0.04946908768551962
+        },
+        {
+          "feature": "handles.nmutant",
+          "importance": 0.04852076773499361
+        },
+        {
+          "feature": "pslist.avg_handlers",
+          "importance": 0.048329282165087056
+        },
+        {
+          "feature": "dlllist.ndlls",
+          "importance": 0.036654056300260425
+        },
+        {
+          "feature": "handles.nhandles",
+          "importance": 0.02955988373006362
+        },
+        {
+          "feature": "handles.nsemaphore",
+          "importance": 0.02822046786493047
+        },
+        {
+          "feature": "handles.nthread",
+          "importance": 0.0264833101226691
+        },
+        {
+          "feature": "ldrmodules.not_in_load",
+          "importance": 0.017208426790464783
+        },
+        {
+          "feature": "handles.ntimer",
+          "importance": 0.016890798514988474
+        },
+        {
+          "feature": "handles.nkey",
+          "importance": 0.010675556669934184
+        },
+        {
+          "feature": "ldrmodules.not_in_mem",
+          "importance": 0.008858788726895446
+        },
+        {
+          "feature": "handles.nfile",
+          "importance": 0.008770667762259177
+        },
+        {
+          "feature": "svcscan.process_services",
+          "importance": 0.008240660968091723
+        },
+        {
+          "feature": "malfind.uniqueInjections",
+          "importance": 0.0013063930411743832
+        },
+        {
+          "feature": "pslist.avg_threads",
+          "importance": 0.0012131694961312963
+        },
+        {
+          "feature": "psxview.not_in_deskthrd",
+          "importance": 0.0012115845503045646
+        },
+        {
+          "feature": "svcscan.nactive",
+          "importance": 0.0010840502964838128
+        },
+        {
+          "feature": "ldrmodules.not_in_mem_avg",
+          "importance": 0.0008750634048233269
+        },
+        {
+          "feature": "pslist.nppid",
+          "importance": 0.0007760819816999306
+        },
+        {
+          "feature": "ldrmodules.not_in_init_avg",
+          "importance": 0.0007269549033920823
+        },
+        {
+          "feature": "malfind.commitCharge",
+          "importance": 0.00068299030887449
+        },
+        {
+          "feature": "ldrmodules.not_in_load_avg",
+          "importance": 0.0006814845497324229
+        },
+        {
+          "feature": "handles.ndirectory",
+          "importance": 0.0006031480638192799
+        },
+        {
+          "feature": "callbacks.ncallbacks",
+          "importance": 0.0005400033734107367
+        },
+        {
+          "feature": "pslist.nproc",
+          "importance": 0.0004601144385373425
+        },
+        {
+          "feature": "psxview.not_in_deskthrd_false_avg",
+          "importance": 0.0004593146437070004
+        },
+        {
+          "feature": "malfind.protection",
+          "importance": 0.0002746837254441784
+        },
+        {
+          "feature": "handles.ndesktop",
+          "importance": 0.00022342812017448887
+        },
+        {
+          "feature": "malfind.ninjections",
+          "importance": 0.00022342534148438664
+        },
+        {
+          "feature": "ldrmodules.not_in_init",
+          "importance": 0.00021522173554297316
+        },
+        {
+          "feature": "psxview.not_in_csrss_handles_false_avg",
+          "importance": 0.00011894168984410911
+        },
+        {
+          "feature": "psxview.not_in_session_false_avg",
+          "importance": 0.00010319192650847008
+        },
+        {
+          "feature": "psxview.not_in_pspcid_list_false_avg",
+          "importance": 9.421053874885672e-05
+        },
+        {
+          "feature": "psxview.not_in_pslist_false_avg",
+          "importance": 9.070060572416024e-05
+        },
+        {
+          "feature": "psxview.not_in_ethread_pool_false_avg",
+          "importance": 8.103102904730233e-05
+        },
+        {
+          "feature": "psxview.not_in_csrss_handles",
+          "importance": 6.842062265384667e-05
+        },
+        {
+          "feature": "psxview.not_in_ethread_pool",
+          "importance": 4.8850734724637096e-05
+        },
+        {
+          "feature": "psxview.not_in_pspcid_list",
+          "importance": 2.122998622152819e-05
+        },
+        {
+          "feature": "psxview.not_in_pslist",
+          "importance": 2.0601936007227087e-05
+        },
+        {
+          "feature": "psxview.not_in_session",
+          "importance": 1.1599499965681745e-05
+        },
+        {
+          "feature": "modules.nmodules",
+          "importance": 1.1355976693511414e-05
+        },
+        {
+          "feature": "callbacks.nanonymous",
+          "importance": 1.5110750139365128e-06
+        },
+        {
+          "feature": "pslist.nprocs64bit",
+          "importance": 0.0
+        },
+        {
+          "feature": "handles.nport",
+          "importance": 0.0
+        },
+        {
+          "feature": "psxview.not_in_eprocess_pool",
+          "importance": 0.0
+        },
+        {
+          "feature": "psxview.not_in_eprocess_pool_false_avg",
+          "importance": 0.0
+        },
+        {
+          "feature": "svcscan.fs_drivers",
+          "importance": 0.0
+        },
+        {
+          "feature": "svcscan.interactive_process_services",
+          "importance": 0.0
+        },
+        {
+          "feature": "callbacks.ngeneric",
+          "importance": 0.0
+        }
+      ],
+      "metrics": {
+        "accuracy": 0.9990900818926297,
+        "macro_f1": 0.9990900814688601,
+        "macro_recall": 0.9990902888332954,
+        "weighted_f1": 0.9990900813276038
+      },
+      "rows": 8792,
+      "threshold_curve": [
+        {
+          "accepted": 8792,
+          "accepted_accuracy": 0.9990900818926297,
+          "coverage": 1.0,
+          "tau": 0.0
+        },
+        {
+          "accepted": 8792,
+          "accepted_accuracy": 0.9990900818926297,
+          "coverage": 1.0,
+          "tau": 0.5
+        },
+        {
+          "accepted": 8790,
+          "accepted_accuracy": 0.9992036405005689,
+          "coverage": 0.9997725204731575,
+          "tau": 0.55
+        },
+        {
+          "accepted": 8786,
+          "accepted_accuracy": 0.999658547689506,
+          "coverage": 0.9993175614194723,
+          "tau": 0.6
+        },
+        {
+          "accepted": 8782,
+          "accepted_accuracy": 1.0,
+          "coverage": 0.9988626023657871,
+          "tau": 0.65
+        },
+        {
+          "accepted": 8782,
+          "accepted_accuracy": 1.0,
+          "coverage": 0.9988626023657871,
+          "tau": 0.7
+        },
+        {
+          "accepted": 8780,
+          "accepted_accuracy": 1.0,
+          "coverage": 0.9986351228389445,
+          "tau": 0.75
+        },
+        {
+          "accepted": 8779,
+          "accepted_accuracy": 1.0,
+          "coverage": 0.9985213830755232,
+          "tau": 0.8
+        },
+        {
+          "accepted": 8777,
+          "accepted_accuracy": 1.0,
+          "coverage": 0.9982939035486806,
+          "tau": 0.85
+        },
+        {
+          "accepted": 8772,
+          "accepted_accuracy": 1.0,
+          "coverage": 0.9977252047315741,
+          "tau": 0.9
+        },
+        {
+          "accepted": 8765,
+          "accepted_accuracy": 1.0,
+          "coverage": 0.9969290263876252,
+          "tau": 0.95
+        },
+        {
+          "accepted": 8721,
+          "accepted_accuracy": 1.0,
+          "coverage": 0.9919244767970883,
+          "tau": 0.99
+        },
+        {
+          "accepted": 8655,
+          "accepted_accuracy": 1.0,
+          "coverage": 0.984417652411283,
+          "tau": 1.0
+        }
+      ]
+    }
+  },
+  "02_binary_lightgbm": {
+    "algorithm": "lightgbm",
+    "classes": [
+      "Benign",
+      "Malware"
+    ],
+    "classifier_params": {
+      "boosting_type": "gbdt",
+      "class_weight": null,
+      "colsample_bytree": 0.9,
+      "importance_type": "split",
+      "learning_rate": 0.1,
+      "max_depth": 12,
+      "min_child_samples": 20,
+      "min_child_weight": 0.001,
+      "min_split_gain": 0.0,
+      "n_estimators": 200,
+      "n_jobs": -1,
+      "num_leaves": 63,
+      "objective": null,
+      "random_state": 42,
+      "reg_alpha": 0.0,
+      "reg_lambda": 0.0,
+      "subsample": 0.9,
+      "subsample_for_bin": 200000,
+      "subsample_freq": 0,
+      "verbose": -1
+    },
+    "feature_count": 55,
+    "selected_config": "lgbm_200_lr01_leaves63_d12",
+    "task": "binary",
+    "tau": 0.95,
+    "test": {
+      "accuracy": 1.0,
+      "at_selected_tau": {
+        "accepted": 8791,
+        "accepted_accuracy": 1.0,
+        "coverage": 1.0,
+        "tau": 0.95
+      },
+      "at_selected_tau_by_class": {
+        "Benign": {
+          "accepted": 4395,
+          "accepted_accuracy": 1.0,
+          "coverage": 1.0,
+          "support": 4395
+        },
+        "Malware": {
+          "accepted": 4396,
+          "accepted_accuracy": 1.0,
+          "coverage": 1.0,
+          "support": 4396
+        }
+      },
+      "classification_report": {
+        "Benign": {
+          "f1-score": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "support": 4395.0
+        },
+        "Malware": {
+          "f1-score": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "support": 4396.0
+        },
+        "accuracy": 1.0,
+        "macro avg": {
+          "f1-score": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "support": 8791.0
+        },
+        "weighted avg": {
+          "f1-score": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "support": 8791.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          4395,
+          0
+        ],
+        [
+          0,
+          4396
+        ]
+      ],
+      "rows": 8791,
+      "uncertain": 0
+    },
+    "validation": {
+      "at_selected_tau": {
+        "accepted": 8790,
+        "accepted_accuracy": 0.9989761092150171,
+        "coverage": 0.9997725204731575,
+        "tau": 0.95
+      },
+      "classification_report": {
+        "Benign": {
+          "f1-score": 0.9988633780404638,
+          "precision": 0.9979559391324098,
+          "recall": 0.9997724687144482,
+          "support": 4395.0
+        },
+        "Malware": {
+          "f1-score": 0.9988618256316868,
+          "precision": 0.9997721576668945,
+          "recall": 0.9979531498749147,
+          "support": 4397.0
+        },
+        "accuracy": 0.9988626023657871,
+        "macro avg": {
+          "f1-score": 0.9988626018360753,
+          "precision": 0.9988640483996521,
+          "recall": 0.9988628092946814,
+          "support": 8792.0
+        },
+        "weighted avg": {
+          "f1-score": 0.9988626016595049,
+          "precision": 0.9988642549759188,
+          "recall": 0.9988626023657871,
+          "support": 8792.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          4394,
+          1
+        ],
+        [
+          9,
+          4388
+        ]
+      ],
+      "feature_importance": [
+        {
+          "feature": "handles.avg_handles_per_proc",
+          "importance": 546
+        },
+        {
+          "feature": "pslist.avg_handlers",
+          "importance": 470
+        },
+        {
+          "feature": "ldrmodules.not_in_load_avg",
+          "importance": 401
+        },
+        {
+          "feature": "pslist.avg_threads",
+          "importance": 368
+        },
+        {
+          "feature": "handles.nthread",
+          "importance": 332
+        },
+        {
+          "feature": "ldrmodules.not_in_init_avg",
+          "importance": 310
+        },
+        {
+          "feature": "ldrmodules.not_in_load",
+          "importance": 292
+        },
+        {
+          "feature": "handles.nevent",
+          "importance": 289
+        },
+        {
+          "feature": "handles.nmutant",
+          "importance": 285
+        },
+        {
+          "feature": "handles.nkey",
+          "importance": 270
+        },
+        {
+          "feature": "dlllist.avg_dlls_per_proc",
+          "importance": 255
+        },
+        {
+          "feature": "handles.ndirectory",
+          "importance": 236
+        },
+        {
+          "feature": "handles.nsection",
+          "importance": 228
+        },
+        {
+          "feature": "dlllist.ndlls",
+          "importance": 221
+        },
+        {
+          "feature": "psxview.not_in_session_false_avg",
+          "importance": 208
+        },
+        {
+          "feature": "psxview.not_in_deskthrd_false_avg",
+          "importance": 189
+        },
+        {
+          "feature": "handles.nsemaphore",
+          "importance": 186
+        },
+        {
+          "feature": "malfind.commitCharge",
+          "importance": 176
+        },
+        {
+          "feature": "handles.ntimer",
+          "importance": 173
+        },
+        {
+          "feature": "callbacks.ncallbacks",
+          "importance": 164
+        },
+        {
+          "feature": "svcscan.nservices",
+          "importance": 149
+        },
+        {
+          "feature": "ldrmodules.not_in_init",
+          "importance": 147
+        },
+        {
+          "feature": "pslist.nproc",
+          "importance": 145
+        },
+        {
+          "feature": "handles.nfile",
+          "importance": 140
+        },
+        {
+          "feature": "handles.nhandles",
+          "importance": 138
+        },
+        {
+          "feature": "psxview.not_in_pslist_false_avg",
+          "importance": 127
+        },
+        {
+          "feature": "svcscan.process_services",
+          "importance": 113
+        },
+        {
+          "feature": "pslist.nppid",
+          "importance": 112
+        },
+        {
+          "feature": "psxview.not_in_csrss_handles_false_avg",
+          "importance": 108
+        },
+        {
+          "feature": "malfind.protection",
+          "importance": 99
+        },
+        {
+          "feature": "psxview.not_in_ethread_pool_false_avg",
+          "importance": 76
+        },
+        {
+          "feature": "svcscan.nactive",
+          "importance": 71
+        },
+        {
+          "feature": "handles.ndesktop",
+          "importance": 60
+        },
+        {
+          "feature": "svcscan.kernel_drivers",
+          "importance": 57
+        },
+        {
+          "feature": "psxview.not_in_deskthrd",
+          "importance": 56
+        },
+        {
+          "feature": "malfind.ninjections",
+          "importance": 51
+        },
+        {
+          "feature": "ldrmodules.not_in_mem_avg",
+          "importance": 49
+        },
+        {
+          "feature": "malfind.uniqueInjections",
+          "importance": 38
+        },
+        {
+          "feature": "psxview.not_in_ethread_pool",
+          "importance": 34
+        },
+        {
+          "feature": "psxview.not_in_pslist",
+          "importance": 28
+        },
+        {
+          "feature": "ldrmodules.not_in_mem",
+          "importance": 18
+        },
+        {
+          "feature": "psxview.not_in_pspcid_list_false_avg",
+          "importance": 13
+        },
+        {
+          "feature": "svcscan.shared_process_services",
+          "importance": 12
+        },
+        {
+          "feature": "psxview.not_in_csrss_handles",
+          "importance": 6
+        },
+        {
+          "feature": "psxview.not_in_pspcid_list",
+          "importance": 2
+        },
+        {
+          "feature": "psxview.not_in_session",
+          "importance": 2
+        },
+        {
+          "feature": "pslist.nprocs64bit",
+          "importance": 0
+        },
+        {
+          "feature": "handles.nport",
+          "importance": 0
+        },
+        {
+          "feature": "psxview.not_in_eprocess_pool",
+          "importance": 0
+        },
+        {
+          "feature": "psxview.not_in_eprocess_pool_false_avg",
+          "importance": 0
+        },
+        {
+          "feature": "modules.nmodules",
+          "importance": 0
+        },
+        {
+          "feature": "svcscan.fs_drivers",
+          "importance": 0
+        },
+        {
+          "feature": "svcscan.interactive_process_services",
+          "importance": 0
+        },
+        {
+          "feature": "callbacks.nanonymous",
+          "importance": 0
+        },
+        {
+          "feature": "callbacks.ngeneric",
+          "importance": 0
+        }
+      ],
+      "metrics": {
+        "accuracy": 0.9988626023657871,
+        "macro_f1": 0.9988626018360753,
+        "macro_recall": 0.9988628092946814,
+        "weighted_f1": 0.9988626016595049
+      },
+      "rows": 8792,
+      "threshold_curve": [
+        {
+          "accepted": 8792,
+          "accepted_accuracy": 0.9988626023657871,
+          "coverage": 1.0,
+          "tau": 0.0
+        },
+        {
+          "accepted": 8792,
+          "accepted_accuracy": 0.9988626023657871,
+          "coverage": 1.0,
+          "tau": 0.5
+        },
+        {
+          "accepted": 8792,
+          "accepted_accuracy": 0.9988626023657871,
+          "coverage": 1.0,
+          "tau": 0.55
+        },
+        {
+          "accepted": 8792,
+          "accepted_accuracy": 0.9988626023657871,
+          "coverage": 1.0,
+          "tau": 0.6
+        },
+        {
+          "accepted": 8791,
+          "accepted_accuracy": 0.9988624729837333,
+          "coverage": 0.9998862602365787,
+          "tau": 0.65
+        },
+        {
+          "accepted": 8791,
+          "accepted_accuracy": 0.9988624729837333,
+          "coverage": 0.9998862602365787,
+          "tau": 0.7
+        },
+        {
+          "accepted": 8791,
+          "accepted_accuracy": 0.9988624729837333,
+          "coverage": 0.9998862602365787,
+          "tau": 0.75
+        },
+        {
+          "accepted": 8790,
+          "accepted_accuracy": 0.9989761092150171,
+          "coverage": 0.9997725204731575,
+          "tau": 0.8
+        },
+        {
+          "accepted": 8790,
+          "accepted_accuracy": 0.9989761092150171,
+          "coverage": 0.9997725204731575,
+          "tau": 0.85
+        },
+        {
+          "accepted": 8790,
+          "accepted_accuracy": 0.9989761092150171,
+          "coverage": 0.9997725204731575,
+          "tau": 0.9
+        },
+        {
+          "accepted": 8790,
+          "accepted_accuracy": 0.9989761092150171,
+          "coverage": 0.9997725204731575,
+          "tau": 0.95
+        },
+        {
+          "accepted": 8789,
+          "accepted_accuracy": 0.9989759927181704,
+          "coverage": 0.9996587807097361,
+          "tau": 0.99
+        },
+        {
+          "accepted": 0,
+          "accepted_accuracy": null,
+          "coverage": 0.0,
+          "tau": 1.0
+        }
+      ]
+    }
+  },
+  "03_multiclass_random_forest": {
+    "algorithm": "random_forest",
+    "classes": [
+      "Benign",
+      "Ransomware",
+      "Spyware",
+      "Trojan"
+    ],
+    "classifier_params": {
+      "bootstrap": true,
+      "ccp_alpha": 0.0,
+      "class_weight": null,
+      "criterion": "gini",
+      "max_depth": 20,
+      "max_features": "sqrt",
+      "max_leaf_nodes": null,
+      "max_samples": null,
+      "min_impurity_decrease": 0.0,
+      "min_samples_leaf": 1,
+      "min_samples_split": 2,
+      "min_weight_fraction_leaf": 0.0,
+      "monotonic_cst": null,
+      "n_estimators": 300,
+      "n_jobs": -1,
+      "oob_score": false,
+      "random_state": 42,
+      "verbose": 0,
+      "warm_start": false
+    },
+    "feature_count": 55,
+    "selected_config": "rf_300_d20",
+    "task": "multiclass",
+    "tau": 0.7,
+    "test": {
+      "accuracy": 0.8390399271982709,
+      "at_selected_tau": {
+        "accepted": 6268,
+        "accepted_accuracy": 0.9521378430121251,
+        "coverage": 0.7130019337959277,
+        "tau": 0.7
+      },
+      "at_selected_tau_by_class": {
+        "Benign": {
+          "accepted": 4393,
+          "accepted_accuracy": 1.0,
+          "coverage": 0.9995449374288965,
+          "support": 4395
+        },
+        "Ransomware": {
+          "accepted": 508,
+          "accepted_accuracy": 0.7952755905511811,
+          "coverage": 0.3458134785568414,
+          "support": 1469
+        },
+        "Spyware": {
+          "accepted": 724,
+          "accepted_accuracy": 0.9060773480662984,
+          "coverage": 0.48138297872340424,
+          "support": 1504
+        },
+        "Trojan": {
+          "accepted": 643,
+          "accepted_accuracy": 0.8009331259720062,
+          "coverage": 0.45186226282501757,
+          "support": 1423
+        }
+      },
+      "classification_report": {
+        "Benign": {
+          "f1-score": 0.9997724687144482,
+          "precision": 0.9997724687144482,
+          "recall": 0.9997724687144482,
+          "support": 4395.0
+        },
+        "Ransomware": {
+          "f1-score": 0.6716570261993875,
+          "precision": 0.6714285714285714,
+          "recall": 0.6718856364874064,
+          "support": 1469.0
+        },
+        "Spyware": {
+          "f1-score": 0.7257731958762886,
+          "precision": 0.7510668563300142,
+          "recall": 0.7021276595744681,
+          "support": 1504.0
+        },
+        "Trojan": {
+          "f1-score": 0.6381243628950051,
+          "precision": 0.6177631578947368,
+          "recall": 0.6598735066760365,
+          "support": 1423.0
+        },
+        "accuracy": 0.8390399271982709,
+        "macro avg": {
+          "f1-score": 0.7588317634212823,
+          "precision": 0.7600077635919427,
+          "recall": 0.7584148178630898,
+          "support": 8791.0
+        },
+        "weighted avg": {
+          "f1-score": 0.8395265642685054,
+          "precision": 0.8405198608842137,
+          "recall": 0.8390399271982709,
+          "support": 8791.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          4394,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          987,
+          176,
+          306
+        ],
+        [
+          1,
+          172,
+          1056,
+          275
+        ],
+        [
+          0,
+          311,
+          173,
+          939
+        ]
+      ],
+      "rows": 8791,
+      "uncertain": 2523
+    },
+    "validation": {
+      "at_selected_tau": {
+        "accepted": 6185,
+        "accepted_accuracy": 0.9631366208569119,
+        "coverage": 0.7034804367606915,
+        "tau": 0.7
+      },
+      "classification_report": {
+        "Benign": {
+          "f1-score": 0.9989771564950563,
+          "precision": 0.9979564032697548,
+          "recall": 1.0,
+          "support": 4395.0
+        },
+        "Ransomware": {
+          "f1-score": 0.6419585175110507,
+          "precision": 0.6413043478260869,
+          "recall": 0.6426140231449966,
+          "support": 1469.0
+        },
+        "Spyware": {
+          "f1-score": 0.739041095890411,
+          "precision": 0.7620056497175142,
+          "recall": 0.7174202127659575,
+          "support": 1504.0
+        },
+        "Trojan": {
+          "f1-score": 0.6703146374829001,
+          "precision": 0.6533333333333333,
+          "recall": 0.6882022471910112,
+          "support": 1424.0
+        },
+        "accuracy": 0.8414467697907189,
+        "macro avg": {
+          "f1-score": 0.7625728518448546,
+          "precision": 0.7636499335366723,
+          "recall": 0.7620591207754913,
+          "support": 8792.0
+        },
+        "weighted avg": {
+          "f1-score": 0.8416273336003565,
+          "precision": 0.8421858101875456,
+          "recall": 0.8414467697907189,
+          "support": 8792.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          4395,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          944,
+          243,
+          282
+        ],
+        [
+          0,
+          187,
+          1079,
+          238
+        ],
+        [
+          9,
+          341,
+          94,
+          980
+        ]
+      ],
+      "feature_importance": [
+        {
+          "feature": "svcscan.nservices",
+          "importance": 0.08442071061629412
+        },
+        {
+          "feature": "svcscan.kernel_drivers",
+          "importance": 0.07052739909849692
+        },
+        {
+          "feature": "svcscan.shared_process_services",
+          "importance": 0.06846354637612784
+        },
+        {
+          "feature": "handles.avg_handles_per_proc",
+          "importance": 0.057582663349341145
+        },
+        {
+          "feature": "dlllist.avg_dlls_per_proc",
+          "importance": 0.05590388531994944
+        },
+        {
+          "feature": "pslist.avg_handlers",
+          "importance": 0.05426740340447959
+        },
+        {
+          "feature": "handles.nevent",
+          "importance": 0.050540025278147514
+        },
+        {
+          "feature": "handles.nmutant",
+          "importance": 0.04672580203779397
+        },
+        {
+          "feature": "handles.nsection",
+          "importance": 0.039904309036589036
+        },
+        {
+          "feature": "dlllist.ndlls",
+          "importance": 0.03785338602850259
+        },
+        {
+          "feature": "handles.nkey",
+          "importance": 0.03509749146381964
+        },
+        {
+          "feature": "handles.nsemaphore",
+          "importance": 0.033876564876614425
+        },
+        {
+          "feature": "handles.nhandles",
+          "importance": 0.03129465518858421
+        },
+        {
+          "feature": "handles.nfile",
+          "importance": 0.029993438533181104
+        },
+        {
+          "feature": "ldrmodules.not_in_load_avg",
+          "importance": 0.028087290065540362
+        },
+        {
+          "feature": "handles.nthread",
+          "importance": 0.026352032204063517
+        },
+        {
+          "feature": "ldrmodules.not_in_mem",
+          "importance": 0.02507249223126405
+        },
+        {
+          "feature": "ldrmodules.not_in_mem_avg",
+          "importance": 0.02396728914008091
+        },
+        {
+          "feature": "ldrmodules.not_in_load",
+          "importance": 0.022717673814846795
+        },
+        {
+          "feature": "ldrmodules.not_in_init_avg",
+          "importance": 0.02038603875412365
+        },
+        {
+          "feature": "pslist.avg_threads",
+          "importance": 0.016418042973316865
+        },
+        {
+          "feature": "handles.ntimer",
+          "importance": 0.012294729635908391
+        },
+        {
+          "feature": "ldrmodules.not_in_init",
+          "importance": 0.010507168607555904
+        },
+        {
+          "feature": "malfind.protection",
+          "importance": 0.00950851164700591
+        },
+        {
+          "feature": "svcscan.nactive",
+          "importance": 0.009062675275627938
+        },
+        {
+          "feature": "malfind.ninjections",
+          "importance": 0.008935429065342827
+        },
+        {
+          "feature": "malfind.commitCharge",
+          "importance": 0.008847868909404782
+        },
+        {
+          "feature": "malfind.uniqueInjections",
+          "importance": 0.00788138255973104
+        },
+        {
+          "feature": "psxview.not_in_deskthrd_false_avg",
+          "importance": 0.006334509530144347
+        },
+        {
+          "feature": "callbacks.ncallbacks",
+          "importance": 0.005480246701430264
+        },
+        {
+          "feature": "svcscan.process_services",
+          "importance": 0.0054084281028066615
+        },
+        {
+          "feature": "handles.ndirectory",
+          "importance": 0.005045344075266278
+        },
+        {
+          "feature": "psxview.not_in_csrss_handles_false_avg",
+          "importance": 0.005043219402225102
+        },
+        {
+          "feature": "pslist.nppid",
+          "importance": 0.00480728834669504
+        },
+        {
+          "feature": "psxview.not_in_session_false_avg",
+          "importance": 0.0047401572196756605
+        },
+        {
+          "feature": "psxview.not_in_deskthrd",
+          "importance": 0.004492823348300085
+        },
+        {
+          "feature": "psxview.not_in_ethread_pool_false_avg",
+          "importance": 0.004250982219502703
+        },
+        {
+          "feature": "psxview.not_in_pslist_false_avg",
+          "importance": 0.003877896910587774
+        },
+        {
+          "feature": "psxview.not_in_pspcid_list_false_avg",
+          "importance": 0.0036591401020144546
+        },
+        {
+          "feature": "pslist.nproc",
+          "importance": 0.0034371341079430704
+        },
+        {
+          "feature": "handles.ndesktop",
+          "importance": 0.003176843374461903
+        },
+        {
+          "feature": "psxview.not_in_csrss_handles",
+          "importance": 0.0027987596758647848
+        },
+        {
+          "feature": "psxview.not_in_ethread_pool",
+          "importance": 0.002750722588006606
+        },
+        {
+          "feature": "psxview.not_in_session",
+          "importance": 0.002663237662472442
+        },
+        {
+          "feature": "psxview.not_in_pslist",
+          "importance": 0.002543373724165754
+        },
+        {
+          "feature": "psxview.not_in_pspcid_list",
+          "importance": 0.002481338873145968
+        },
+        {
+          "feature": "callbacks.nanonymous",
+          "importance": 0.00021076509603716815
+        },
+        {
+          "feature": "modules.nmodules",
+          "importance": 0.00010888943670155223
+        },
+        {
+          "feature": "psxview.not_in_eprocess_pool_false_avg",
+          "importance": 8.439115462089404e-05
+        },
+        {
+          "feature": "psxview.not_in_eprocess_pool",
+          "importance": 7.07194863094016e-05
+        },
+        {
+          "feature": "svcscan.fs_drivers",
+          "importance": 2.95362295583329e-05
+        },
+        {
+          "feature": "callbacks.ngeneric",
+          "importance": 1.4347140329394082e-05
+        },
+        {
+          "feature": "pslist.nprocs64bit",
+          "importance": 0.0
+        },
+        {
+          "feature": "handles.nport",
+          "importance": 0.0
+        },
+        {
+          "feature": "svcscan.interactive_process_services",
+          "importance": 0.0
+        }
+      ],
+      "metrics": {
+        "accuracy": 0.8414467697907189,
+        "macro_f1": 0.7625728518448546,
+        "macro_recall": 0.7620591207754913,
+        "weighted_f1": 0.8416273336003565
+      },
+      "rows": 8792,
+      "threshold_curve": [
+        {
+          "accepted": 8792,
+          "accepted_accuracy": 0.8414467697907189,
+          "coverage": 1.0,
+          "tau": 0.0
+        },
+        {
+          "accepted": 7803,
+          "accepted_accuracy": 0.8914520056388568,
+          "coverage": 0.8875113739763422,
+          "tau": 0.5
+        },
+        {
+          "accepted": 7349,
+          "accepted_accuracy": 0.9091032793577357,
+          "coverage": 0.8358735213830755,
+          "tau": 0.55
+        },
+        {
+          "accepted": 6911,
+          "accepted_accuracy": 0.9311242946028071,
+          "coverage": 0.7860555050045496,
+          "tau": 0.6
+        },
+        {
+          "accepted": 6509,
+          "accepted_accuracy": 0.9494546013212475,
+          "coverage": 0.7403321201091901,
+          "tau": 0.65
+        },
+        {
+          "accepted": 6185,
+          "accepted_accuracy": 0.9631366208569119,
+          "coverage": 0.7034804367606915,
+          "tau": 0.7
+        },
+        {
+          "accepted": 5896,
+          "accepted_accuracy": 0.9742198100407056,
+          "coverage": 0.6706096451319381,
+          "tau": 0.75
+        },
+        {
+          "accepted": 5607,
+          "accepted_accuracy": 0.9821651507044765,
+          "coverage": 0.6377388535031847,
+          "tau": 0.8
+        },
+        {
+          "accepted": 5342,
+          "accepted_accuracy": 0.9891426432047922,
+          "coverage": 0.6075978161965423,
+          "tau": 0.85
+        },
+        {
+          "accepted": 5049,
+          "accepted_accuracy": 0.9946524064171123,
+          "coverage": 0.5742720655141037,
+          "tau": 0.9
+        },
+        {
+          "accepted": 4811,
+          "accepted_accuracy": 0.9970900020785699,
+          "coverage": 0.5472020018198362,
+          "tau": 0.95
+        },
+        {
+          "accepted": 4585,
+          "accepted_accuracy": 0.9995637949836423,
+          "coverage": 0.5214968152866242,
+          "tau": 0.99
+        },
+        {
+          "accepted": 4378,
+          "accepted_accuracy": 1.0,
+          "coverage": 0.49795268425841677,
+          "tau": 1.0
+        }
+      ]
+    }
+  },
+  "04_multiclass_lightgbm": {
+    "algorithm": "lightgbm",
+    "classes": [
+      "Benign",
+      "Ransomware",
+      "Spyware",
+      "Trojan"
+    ],
+    "classifier_params": {
+      "boosting_type": "gbdt",
+      "class_weight": null,
+      "colsample_bytree": 0.9,
+      "importance_type": "split",
+      "learning_rate": 0.1,
+      "max_depth": 12,
+      "min_child_samples": 20,
+      "min_child_weight": 0.001,
+      "min_split_gain": 0.0,
+      "n_estimators": 200,
+      "n_jobs": -1,
+      "num_leaves": 63,
+      "objective": null,
+      "random_state": 42,
+      "reg_alpha": 0.0,
+      "reg_lambda": 0.0,
+      "subsample": 0.9,
+      "subsample_for_bin": 200000,
+      "subsample_freq": 0,
+      "verbose": -1
+    },
+    "feature_count": 55,
+    "selected_config": "lgbm_200_lr01_leaves63_d12",
+    "task": "multiclass",
+    "tau": 0.8,
+    "test": {
+      "accuracy": 0.8441587987714708,
+      "at_selected_tau": {
+        "accepted": 6367,
+        "accepted_accuracy": 0.9552379456572955,
+        "coverage": 0.7242634512569673,
+        "tau": 0.8
+      },
+      "at_selected_tau_by_class": {
+        "Benign": {
+          "accepted": 4395,
+          "accepted_accuracy": 1.0,
+          "coverage": 1.0,
+          "support": 4395
+        },
+        "Ransomware": {
+          "accepted": 541,
+          "accepted_accuracy": 0.7966728280961183,
+          "coverage": 0.3682777399591559,
+          "support": 1469
+        },
+        "Spyware": {
+          "accepted": 738,
+          "accepted_accuracy": 0.9173441734417345,
+          "coverage": 0.49069148936170215,
+          "support": 1504
+        },
+        "Trojan": {
+          "accepted": 693,
+          "accepted_accuracy": 0.8354978354978355,
+          "coverage": 0.4869992972593113,
+          "support": 1423
+        }
+      },
+      "classification_report": {
+        "Benign": {
+          "f1-score": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "support": 4395.0
+        },
+        "Ransomware": {
+          "f1-score": 0.6680175616345829,
+          "precision": 0.6628686327077749,
+          "recall": 0.6732471068754254,
+          "support": 1469.0
+        },
+        "Spyware": {
+          "f1-score": 0.7449419568822554,
+          "precision": 0.7432164129715421,
+          "recall": 0.7466755319148937,
+          "support": 1504.0
+        },
+        "Trojan": {
+          "f1-score": 0.6491477272727273,
+          "precision": 0.656137832017229,
+          "recall": 0.6423049894588897,
+          "support": 1423.0
+        },
+        "accuracy": 0.8441587987714708,
+        "macro avg": {
+          "f1-score": 0.7655268114473914,
+          "precision": 0.7655557194241365,
+          "recall": 0.7655569070623022,
+          "support": 8791.0
+        },
+        "weighted avg": {
+          "f1-score": 0.8440959750996707,
+          "precision": 0.844071850929068,
+          "recall": 0.8441587987714708,
+          "support": 8791.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          4395,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          989,
+          207,
+          273
+        ],
+        [
+          0,
+          175,
+          1123,
+          206
+        ],
+        [
+          0,
+          328,
+          181,
+          914
+        ]
+      ],
+      "rows": 8791,
+      "uncertain": 2424
+    },
+    "validation": {
+      "at_selected_tau": {
+        "accepted": 6330,
+        "accepted_accuracy": 0.9554502369668246,
+        "coverage": 0.7199727024567789,
+        "tau": 0.8
+      },
+      "classification_report": {
+        "Benign": {
+          "f1-score": 0.9989771564950563,
+          "precision": 0.9979564032697548,
+          "recall": 1.0,
+          "support": 4395.0
+        },
+        "Ransomware": {
+          "f1-score": 0.6397557666214383,
+          "precision": 0.6375929682217715,
+          "recall": 0.641933287950987,
+          "support": 1469.0
+        },
+        "Spyware": {
+          "f1-score": 0.7495003331112592,
+          "precision": 0.7510013351134847,
+          "recall": 0.7480053191489362,
+          "support": 1504.0
+        },
+        "Trojan": {
+          "f1-score": 0.6793650793650794,
+          "precision": 0.6824946846208363,
+          "recall": 0.6762640449438202,
+          "support": 1424.0
+        },
+        "accuracy": 0.844631483166515,
+        "macro avg": {
+          "f1-score": 0.7668995838982082,
+          "precision": 0.7672613478064617,
+          "recall": 0.7665506630109358,
+          "support": 8792.0
+        },
+        "weighted avg": {
+          "f1-score": 0.8445143537281474,
+          "precision": 0.84440638098261,
+          "recall": 0.844631483166515,
+          "support": 8792.0
+        }
+      },
+      "confusion_matrix": [
+        [
+          4395,
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          943,
+          255,
+          271
+        ],
+        [
+          0,
+          202,
+          1125,
+          177
+        ],
+        [
+          9,
+          334,
+          118,
+          963
+        ]
+      ],
+      "feature_importance": [
+        {
+          "feature": "handles.nkey",
+          "importance": 3229
+        },
+        {
+          "feature": "handles.nfile",
+          "importance": 2852
+        },
+        {
+          "feature": "ldrmodules.not_in_load_avg",
+          "importance": 2719
+        },
+        {
+          "feature": "ldrmodules.not_in_init_avg",
+          "importance": 2709
+        },
+        {
+          "feature": "pslist.avg_threads",
+          "importance": 2578
+        },
+        {
+          "feature": "dlllist.avg_dlls_per_proc",
+          "importance": 2402
+        },
+        {
+          "feature": "handles.nthread",
+          "importance": 2301
+        },
+        {
+          "feature": "handles.nsection",
+          "importance": 2268
+        },
+        {
+          "feature": "handles.nsemaphore",
+          "importance": 2131
+        },
+        {
+          "feature": "handles.avg_handles_per_proc",
+          "importance": 1896
+        },
+        {
+          "feature": "handles.nevent",
+          "importance": 1839
+        },
+        {
+          "feature": "pslist.avg_handlers",
+          "importance": 1672
+        },
+        {
+          "feature": "malfind.commitCharge",
+          "importance": 1641
+        },
+        {
+          "feature": "dlllist.ndlls",
+          "importance": 1424
+        },
+        {
+          "feature": "handles.nmutant",
+          "importance": 1354
+        },
+        {
+          "feature": "handles.nhandles",
+          "importance": 1169
+        },
+        {
+          "feature": "callbacks.ncallbacks",
+          "importance": 1028
+        },
+        {
+          "feature": "ldrmodules.not_in_load",
+          "importance": 1023
+        },
+        {
+          "feature": "svcscan.nactive",
+          "importance": 961
+        },
+        {
+          "feature": "malfind.ninjections",
+          "importance": 934
+        },
+        {
+          "feature": "psxview.not_in_deskthrd_false_avg",
+          "importance": 840
+        },
+        {
+          "feature": "ldrmodules.not_in_mem_avg",
+          "importance": 790
+        },
+        {
+          "feature": "ldrmodules.not_in_init",
+          "importance": 720
+        },
+        {
+          "feature": "handles.ntimer",
+          "importance": 643
+        },
+        {
+          "feature": "pslist.nppid",
+          "importance": 548
+        },
+        {
+          "feature": "psxview.not_in_pslist_false_avg",
+          "importance": 511
+        },
+        {
+          "feature": "handles.ndirectory",
+          "importance": 502
+        },
+        {
+          "feature": "malfind.uniqueInjections",
+          "importance": 472
+        },
+        {
+          "feature": "psxview.not_in_ethread_pool_false_avg",
+          "importance": 448
+        },
+        {
+          "feature": "psxview.not_in_session_false_avg",
+          "importance": 419
+        },
+        {
+          "feature": "psxview.not_in_csrss_handles_false_avg",
+          "importance": 376
+        },
+        {
+          "feature": "psxview.not_in_pslist",
+          "importance": 306
+        },
+        {
+          "feature": "ldrmodules.not_in_mem",
+          "importance": 252
+        },
+        {
+          "feature": "pslist.nproc",
+          "importance": 243
+        },
+        {
+          "feature": "psxview.not_in_deskthrd",
+          "importance": 241
+        },
+        {
+          "feature": "svcscan.nservices",
+          "importance": 239
+        },
+        {
+          "feature": "psxview.not_in_ethread_pool",
+          "importance": 199
+        },
+        {
+          "feature": "svcscan.process_services",
+          "importance": 152
+        },
+        {
+          "feature": "malfind.protection",
+          "importance": 146
+        },
+        {
+          "feature": "handles.ndesktop",
+          "importance": 137
+        },
+        {
+          "feature": "psxview.not_in_pspcid_list_false_avg",
+          "importance": 89
+        },
+        {
+          "feature": "psxview.not_in_eprocess_pool_false_avg",
+          "importance": 45
+        },
+        {
+          "feature": "callbacks.nanonymous",
+          "importance": 35
+        },
+        {
+          "feature": "psxview.not_in_pspcid_list",
+          "importance": 32
+        },
+        {
+          "feature": "psxview.not_in_csrss_handles",
+          "importance": 27
+        },
+        {
+          "feature": "svcscan.kernel_drivers",
+          "importance": 24
+        },
+        {
+          "feature": "svcscan.shared_process_services",
+          "importance": 21
+        },
+        {
+          "feature": "modules.nmodules",
+          "importance": 15
+        },
+        {
+          "feature": "psxview.not_in_session",
+          "importance": 5
+        },
+        {
+          "feature": "psxview.not_in_eprocess_pool",
+          "importance": 3
+        },
+        {
+          "feature": "pslist.nprocs64bit",
+          "importance": 0
+        },
+        {
+          "feature": "handles.nport",
+          "importance": 0
+        },
+        {
+          "feature": "svcscan.fs_drivers",
+          "importance": 0
+        },
+        {
+          "feature": "svcscan.interactive_process_services",
+          "importance": 0
+        },
+        {
+          "feature": "callbacks.ngeneric",
+          "importance": 0
+        }
+      ],
+      "metrics": {
+        "accuracy": 0.844631483166515,
+        "macro_f1": 0.7668995838982082,
+        "macro_recall": 0.7665506630109358,
+        "weighted_f1": 0.8445143537281474
+      },
+      "rows": 8792,
+      "threshold_curve": [
+        {
+          "accepted": 8792,
+          "accepted_accuracy": 0.844631483166515,
+          "coverage": 1.0,
+          "tau": 0.0
+        },
+        {
+          "accepted": 8272,
+          "accepted_accuracy": 0.8722195357833655,
+          "coverage": 0.9408553230209281,
+          "tau": 0.5
+        },
+        {
+          "accepted": 7933,
+          "accepted_accuracy": 0.8878104122021934,
+          "coverage": 0.9022975432211101,
+          "tau": 0.55
+        },
+        {
+          "accepted": 7621,
+          "accepted_accuracy": 0.9018501508988321,
+          "coverage": 0.866810737033667,
+          "tau": 0.6
+        },
+        {
+          "accepted": 7299,
+          "accepted_accuracy": 0.9175229483490889,
+          "coverage": 0.830186533212011,
+          "tau": 0.65
+        },
+        {
+          "accepted": 6992,
+          "accepted_accuracy": 0.9302059496567505,
+          "coverage": 0.7952684258416742,
+          "tau": 0.7
+        },
+        {
+          "accepted": 6672,
+          "accepted_accuracy": 0.9413968824940048,
+          "coverage": 0.7588717015468608,
+          "tau": 0.75
+        },
+        {
+          "accepted": 6330,
+          "accepted_accuracy": 0.9554502369668246,
+          "coverage": 0.7199727024567789,
+          "tau": 0.8
+        },
+        {
+          "accepted": 5985,
+          "accepted_accuracy": 0.9664160401002506,
+          "coverage": 0.6807324840764332,
+          "tau": 0.85
+        },
+        {
+          "accepted": 5595,
+          "accepted_accuracy": 0.9805183199285076,
+          "coverage": 0.6363739763421292,
+          "tau": 0.9
+        },
+        {
+          "accepted": 5157,
+          "accepted_accuracy": 0.9889470622454916,
+          "coverage": 0.5865559599636033,
+          "tau": 0.95
+        },
+        {
+          "accepted": 4744,
+          "accepted_accuracy": 0.9970489038785835,
+          "coverage": 0.5395814376706096,
+          "tau": 0.99
+        },
+        {
+          "accepted": 0,
+          "accepted_accuracy": null,
+          "coverage": 0.0,
+          "tau": 1.0
+        }
+      ]
+    }
+  }
+}

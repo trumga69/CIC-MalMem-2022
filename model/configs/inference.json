@@ -1,0 +1,30 @@
+{
+  "feature_count": 55,
+  "uncertain_label": "Uncertain",
+  "defaults": {
+    "binary": "02_binary_lightgbm",
+    "multiclass": "04_multiclass_lightgbm"
+  },
+  "models": {
+    "01_binary_random_forest": {
+      "task": "binary",
+      "artifact": "model/artifacts/01_binary_random_forest.joblib",
+      "tau": 0.95
+    },
+    "02_binary_lightgbm": {
+      "task": "binary",
+      "artifact": "model/artifacts/02_binary_lightgbm.joblib",
+      "tau": 0.95
+    },
+    "03_multiclass_random_forest": {
+      "task": "multiclass",
+      "artifact": "model/artifacts/03_multiclass_random_forest.joblib",
+      "tau": 0.70
+    },
+    "04_multiclass_lightgbm": {
+      "task": "multiclass",
+      "artifact": "model/artifacts/04_multiclass_lightgbm.joblib",
+      "tau": 0.80
+    }
+  }
+}

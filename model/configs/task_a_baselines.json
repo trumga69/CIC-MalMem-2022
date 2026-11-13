@@ -1,0 +1,54 @@
+{
+  "task": "binary",
+  "split_sha256": "d76026481f669ad42e8af6e7c14770c409091b2ca0b213383a00354f94769b19",
+  "labels": [
+    "Benign",
+    "Malware"
+  ],
+  "tau_grid": [
+    0.0,
+    0.5,
+    0.55,
+    0.6,
+    0.65,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95,
+    0.99,
+    1.0
+  ],
+  "selected_tau": {
+    "random_forest": 0.95,
+    "lightgbm": 0.95
+  },
+  "selected_model_name": {
+    "random_forest": "rf_100_dNone",
+    "lightgbm": "lgbm_200_lr01_leaves63_d12"
+  },
+  "models": {
+    "random_forest": {
+      "n_estimators": 100,
+      "max_depth": null,
+      "min_samples_leaf": 1,
+      "max_features": "sqrt",
+      "class_weight": null,
+      "random_state": 42,
+      "n_jobs": -1
+    },
+    "lightgbm": {
+      "n_estimators": 200,
+      "learning_rate": 0.1,
+      "num_leaves": 63,
+      "max_depth": 12,
+      "min_child_samples": 20,
+      "subsample": 0.9,
+      "colsample_bytree": 0.9,
+      "random_state": 42,
+      "n_jobs": -1,
+      "verbose": -1
+    }
+  }
+}

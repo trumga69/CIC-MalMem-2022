@@ -1,6 +1,11 @@
-"""Chuẩn bị dữ liệu: tạo/đọc bộ chia train-validation-test và pipeline tiền xử lý."""
+'''
+Preprocessing cho CIC-MalMem-2022 (Topic 05).
+Tận dụng các hàm đã viết trong folder audit và dữ liệu trong folder data.
+'''
+
 import hashlib
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -10,208 +15,205 @@ from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.impute import SimpleImputer
-from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from sklearn.utils.validation import check_array, check_is_fitted
 
-# ---------------------------------------------------------------- Cấu hình
-ROOT = Path(__file__).resolve().parent
-DATA_PATH = ROOT / "data/raw/Obfuscated-MalMem2022.csv"
-SPLIT_DIR = ROOT / "data/splits"
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from audit.load import derive_family, derive_sample_token, feature_columns
+
+DATA_PATH = ROOT / "data" / "raw" / "Obfuscated-MalMem2022.csv"
+SPLIT_DIR = ROOT / "data" / "splits"
 SPLIT_FILE = SPLIT_DIR / "master_split.csv"
 METADATA_FILE = SPLIT_DIR / "metadata.json"
 
 RANDOM_SEED = 42
+SPLIT_RATIOS = {"train": 0.7, "validation": 0.15, "test": 0.15}
 SPLIT_NAMES = ["train", "validation", "test"]
-SPLIT_POLICY = ("connected exact-feature duplicates + Category sample token; "
-                "SGKF5 folds 0=test,1=validation,2-4=train")
-
-# Category có dạng "Loại-Họ-<mã mẫu>-<số thứ tự>.raw", ví dụ "Trojan-Zeus-0dd1...-4.raw".
-SAMPLE_TOKEN_PATTERN = r"^[^-]+-[^-]+-([0-9a-fA-F]+)-[0-9]+\.raw$"
-BINARY_LABEL_OF = {"Benign": "Benign", "Ransomware": "Malware",
-                   "Spyware": "Malware", "Trojan": "Malware"}
+SPLIT_POLICY = (
+    "connected exact-feature duplicates + Category sample token; "
+    "greedy group allocation by multiclass counts, 70/15/15"
+)
 
 
 def checksum(path):
-    """Mã SHA-256 của một file, dùng để phát hiện file bị đổi."""
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def get_malware_family(category):
-    """'Trojan-Zeus-<mã>-1.raw' -> 'Trojan-Zeus'. Benign giữ nguyên."""
-    is_benign = category.eq("Benign")
-    family = category.str.split("-").str[:2].str.join("-")
-    return category.where(is_benign, family)
-
-
-# ---------------------------------------------------------------- Đọc dữ liệu
 def read_raw_data(path=DATA_PATH):
-    """Đọc CSV và tách thành features, nhãn binary, nhãn multiclass và cột Category."""
-    table = pd.read_csv(path)
-    if not {"Category", "Class"}.issubset(table.columns):
-        raise ValueError("Dataset thiếu cột Category hoặc Class")
-
-    multiclass_labels = table["Category"].str.split("-").str[0]
-    expected_binary = multiclass_labels.map(BINARY_LABEL_OF)
-    if expected_binary.isna().any() or not table["Class"].eq(expected_binary).all():
-        raise ValueError("Category không hợp lệ hoặc không khớp với Class")
-
-    features = table.drop(columns=["Category", "Class"])
-    if not features.select_dtypes(exclude="number").empty:
-        raise ValueError("Features phải là kiểu số")
-    if np.isinf(features.to_numpy()).any():
-        raise ValueError("Features có giá trị vô cực, cần quyết định cách xử lý")
-
-    return features, table["Class"], multiclass_labels, table["Category"]
+    """Đọc CSV gốc và tách X, nhãn binary, nhãn multiclass bằng các hàm bên audit."""
+    df = pd.read_csv(path)
+    X = df[feature_columns(df)]
+    y_binary = df["Class"]
+    y_multiclass = derive_family(df).rename("multiclass")
+    return X, y_binary, y_multiclass, df
 
 
-# ---------------------------------------------------------------- Gom nhóm liên quan
-def find_related_groups(features, category):
-    """Gán mỗi dòng một mã nhóm. Hai dòng cùng nhóm nếu có features giống hệt nhau
-    HOẶC cùng mã mẫu trong Category (kể cả liên kết bắc cầu qua dòng thứ ba).
-    Mã nhóm = chỉ số dòng nhỏ nhất trong nhóm, nên luôn ổn định giữa các lần chạy."""
-    sample_token = category.str.extract(SAMPLE_TOKEN_PATTERN)[0].str.lower()
-    if (category.ne("Benign") & sample_token.isna()).any():
-        raise ValueError("Có Category không đọc được mã mẫu, cần kiểm tra lại")
+def find_related_groups(df):
+    """Gom các dòng trùng toàn bộ features hoặc cùng mã mẫu (sample token) vào chung nhóm.
+    group_id là chỉ số dòng nhỏ nhất trong nhóm.
+    """
+    feat_cols = feature_columns(df)
+    feature_group = df.groupby(feat_cols, dropna=False, sort=False).ngroup()
+    sample_token = derive_sample_token(df)
 
-    feature_key = features.groupby(list(features.columns), dropna=False, sort=False).ngroup()
+    n_rows = len(df)
+    row_idx = pd.Series(range(n_rows))
 
-    # Nối mỗi dòng với dòng đầu tiên có cùng khóa, rồi tìm các cụm dòng được nối với nhau.
-    row_count = len(features)
-    row_numbers = pd.Series(np.arange(row_count))
-    linked_from, linked_to = [], []
-    for key in (feature_key, sample_token):
-        # Dùng mảng khóa để nhóm theo vị trí dòng, không căn theo index pandas.
-        first_row_with_same_key = row_numbers.groupby(key.to_numpy()).transform("min")
-        has_key = first_row_with_same_key.notna()
-        linked_from.append(row_numbers[has_key].to_numpy())
-        linked_to.append(first_row_with_same_key[has_key].astype(int).to_numpy())
-    linked_from, linked_to = np.concatenate(linked_from), np.concatenate(linked_to)
+    # Nối mỗi dòng với dòng đầu tiên có cùng feature vector hoặc cùng mã mẫu
+    first_by_feature = row_idx.groupby(feature_group).transform("min")
+    has_token = sample_token.notna()
+    first_by_token = row_idx[has_token].groupby(sample_token[has_token]).transform("min")
 
-    links = coo_matrix((np.ones(len(linked_from)), (linked_from, linked_to)),
-                       shape=(row_count, row_count))
-    _, component_of_row = connected_components(links, directed=False)
+    rows = np.concatenate([row_idx.to_numpy(), row_idx[has_token].to_numpy()])
+    targets = np.concatenate([first_by_feature.to_numpy(), first_by_token.to_numpy()])
 
-    return row_numbers.groupby(component_of_row).transform("min").to_numpy()
+    # Tìm các thành phần liên thông để gom cả các nhóm bắc cầu
+    graph = coo_matrix((np.ones(len(rows)), (rows, targets)), shape=(n_rows, n_rows))
+    _, component = connected_components(graph, directed=False)
+    return row_idx.groupby(component).transform("min").to_numpy()
 
 
-def check_split_table(split_table, group_ids, multiclass_labels):
-    """Báo lỗi nếu bộ chia bị thiếu dòng, tách nhóm liên quan, hoặc thiếu lớp."""
+def create_split_table(y_multiclass, group_ids):
+    """Chia các nhóm vào train/validation/test theo tỷ lệ 70/15/15."""
+    group_counts = pd.crosstab(group_ids, y_multiclass)
+
+    # Xáo trộn ngẫu nhiên rồi ưu tiên xếp các nhóm lớn trước
+    shuffled = group_counts.sample(frac=1, random_state=RANDOM_SEED)
+    shuffled["total"] = shuffled.sum(axis=1)
+    group_order = shuffled.sort_values("total", ascending=False, kind="mergesort").drop(columns="total")
+
+    counts_arr = group_order.to_numpy()
+    ratios_arr = np.array(list(SPLIT_RATIOS.values()))
+    deficit = np.outer(ratios_arr, counts_arr.sum(axis=0))
+
+    split_of_group = {}
+    for gid, row in zip(group_order.index, counts_arr):
+        # Chọn tập đang thiếu nhiều mẫu của các lớp trong nhóm này nhất
+        best_idx = int(np.argmax(deficit @ row))
+        split_of_group[gid] = SPLIT_NAMES[best_idx]
+        deficit[best_idx] -= row
+
+    return pd.DataFrame({
+        "row_index": np.arange(len(group_ids)),
+        "group_id": group_ids,
+        "split": pd.Series(group_ids).map(split_of_group).to_numpy(),
+    })
+
+
+def check_split_table(split_table, group_ids, y_multiclass):
+    """Kiểm tra bảng chia có hợp lệ và có bị rò rỉ nhóm giữa các tập không."""
     if list(split_table.columns) != ["row_index", "group_id", "split"]:
-        raise ValueError("Sai cấu trúc file split")
+        raise ValueError("Sai tên cột trong master_split.csv")
     if not np.array_equal(split_table["row_index"], np.arange(len(group_ids))):
-        raise ValueError("File split phải có đủ mọi dòng, đúng thứ tự gốc")
+        raise ValueError("row_index không khớp thứ tự dòng gốc")
     if not np.array_equal(split_table["group_id"], group_ids):
-        raise ValueError("Nhóm liên quan đã thay đổi so với lúc tạo split")
-    if set(split_table["split"]) != set(SPLIT_NAMES):
-        raise ValueError("Tên tập không hợp lệ")
-    if split_table.groupby("group_id")["split"].nunique().max() != 1:
-        raise ValueError("Có nhóm liên quan bị tách sang nhiều tập")
-    for split_name in SPLIT_NAMES:
-        classes_in_split = set(multiclass_labels[split_table["split"].eq(split_name)])
-        if classes_in_split != set(multiclass_labels):
-            raise ValueError(f"Tập {split_name} thiếu một lớp")
+        raise ValueError("group_id không khớp với dữ liệu hiện tại")
+    if not split_table["split"].isin(SPLIT_NAMES).all():
+        raise ValueError("Cột split có tên tập không hợp lệ")
+    if (split_table.groupby("group_id")["split"].nunique() > 1).any():
+        raise ValueError("Có nhóm mẫu liên quan bị nằm ở nhiều tập khác nhau")
+
+    class_counts = pd.crosstab(split_table["split"], y_multiclass)
+    if (class_counts == 0).any().any():
+        raise ValueError("Có tập bị thiếu lớp dữ liệu")
 
 
-# ---------------------------------------------------------------- Tạo / đọc bộ chia
-def create_split_table(features, multiclass_labels, group_ids):
-    """Chia 5 phần theo nhóm: phần 0 = test, phần 1 = validation, còn lại = train."""
-    split_of_row = np.full(len(features), "train", dtype=object)
-    splitter = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=RANDOM_SEED)
-    folds = splitter.split(features, multiclass_labels, group_ids)
-    for split_name, (_, row_positions) in zip(["test", "validation"], folds):
-        split_of_row[row_positions] = split_name
-    return pd.DataFrame({"row_index": np.arange(len(features)),
-                         "group_id": group_ids, "split": split_of_row})
+def load_master_split(data_path=DATA_PATH, *, create=False):
+    """Load the saved split. Allow creation only when explicitly requested."""
+    missing = [path for path in (SPLIT_FILE, METADATA_FILE) if not path.exists()]
+    if missing and (len(missing) != 2 or not create):
+        names = ", ".join(path.name for path in missing)
+        raise FileNotFoundError(f"Missing master split files: {names}. "
+                                "Restore the official master_split.csv and metadata.json.")
+
+    X, y_binary, y_multiclass, df = read_raw_data(data_path)
+    group_ids = find_related_groups(df)
+
+    expected_meta = {
+        "seed": RANDOM_SEED,
+        "policy": SPLIT_POLICY,
+        "ratios": SPLIT_RATIOS,
+        "raw_sha256": checksum(data_path),
+        "features": list(X.columns),
+        "rows": len(X),
+    }
+
+    if not missing:
+        meta = json.loads(METADATA_FILE.read_text(encoding="utf-8"))
+        for key, val in expected_meta.items():
+            if meta.get(key) != val:
+                raise ValueError(f"Metadata không khớp ở trường: {key}")
+        if meta.get("split_sha256") != checksum(SPLIT_FILE):
+            raise ValueError("File master_split.csv đã bị thay đổi so với metadata")
+
+        split_table = pd.read_csv(SPLIT_FILE)
+        check_split_table(split_table, group_ids, y_multiclass)
+        return X, y_binary, y_multiclass, split_table
+
+    # Nếu chưa có file split thì tạo mới và lưu lại
+    split_table = create_split_table(y_multiclass, group_ids)
+    check_split_table(split_table, group_ids, y_multiclass)
+
+    SPLIT_DIR.mkdir(parents=True, exist_ok=True)
+    split_table.to_csv(SPLIT_FILE, index=False, mode="x")
+
+    metadata = {
+        **expected_meta,
+        "split_sha256": checksum(SPLIT_FILE),
+        "sklearn": sklearn.__version__,
+        "numpy": np.__version__,
+        "pandas": pd.__version__,
+    }
+    with METADATA_FILE.open("x", encoding="utf-8") as file:
+        json.dump(metadata, file, indent=2, ensure_ascii=False)
+    return X, y_binary, y_multiclass, split_table
 
 
-def load_master_split(data_path=DATA_PATH, split_dir=SPLIT_DIR):
-    """Nếu đã có split thì đọc và kiểm tra; chưa có thì tạo và lưu. Không bao giờ ghi đè split cũ."""
-    split_file = Path(split_dir) / "master_split.csv"
-    metadata_file = Path(split_dir) / "metadata.json"
-
-    features, binary_labels, multiclass_labels, category = read_raw_data(data_path)
-    group_ids = find_related_groups(features, category)
-    current_setup = {"seed": RANDOM_SEED, "policy": SPLIT_POLICY,
-                     "raw_sha256": checksum(data_path),
-                     "features": list(features.columns), "rows": len(features)}
-
-    has_split, has_metadata = split_file.exists(), metadata_file.exists()
-    if has_split != has_metadata:
-        raise ValueError("Split lưu dở dang, cần kiểm tra thủ công trước khi tạo lại")
-
-    if has_split:
-        saved_setup = json.loads(metadata_file.read_text(encoding="utf-8"))
-        if any(saved_setup.get(key) != value for key, value in current_setup.items()):
-            raise ValueError("Dữ liệu hoặc cấu hình đã đổi; split cũ không bị ghi đè")
-        if saved_setup.get("split_sha256") != checksum(split_file):
-            raise ValueError("Checksum của file split không khớp")
-        split_table = pd.read_csv(split_file)
-        check_split_table(split_table, group_ids, multiclass_labels)
-    else:
-        split_table = create_split_table(features, multiclass_labels, group_ids)
-        check_split_table(split_table, group_ids, multiclass_labels)
-        Path(split_dir).mkdir(parents=True, exist_ok=True)
-        split_table.to_csv(split_file, index=False)
-        current_setup.update(split_sha256=checksum(split_file),
-                             sklearn=sklearn.__version__, numpy=np.__version__,
-                             pandas=pd.__version__)
-        metadata_file.write_text(json.dumps(current_setup, indent=2), encoding="utf-8")
-
-    return features, binary_labels, multiclass_labels, split_table
-
-
-def load_splits(task, path=DATA_PATH, split_dir=SPLIT_DIR):
-    """Trả về {'train': (X, y), 'validation': (X, y), 'test': (X, y)}.
-    task = 'binary' (Benign/Malware) hoặc 'multiclass' (4 lớp). X chưa được biến đổi."""
+def load_splits(task="binary", data_path=DATA_PATH):
+    """Trả về dict {'train': (X, y), 'validation': (X, y), 'test': (X, y)} cho notebook."""
     if task not in ("binary", "multiclass"):
         raise ValueError("task phải là 'binary' hoặc 'multiclass'")
-    features, binary_labels, multiclass_labels, split_table = load_master_split(path, split_dir)
-    labels = binary_labels if task == "binary" else multiclass_labels
 
-    splits = {}
-    for split_name in SPLIT_NAMES:
-        rows_in_split = split_table["split"].eq(split_name)
-        splits[split_name] = (features.loc[rows_in_split], labels.loc[rows_in_split])
-    return splits
+    X, y_binary, y_multiclass, split_table = load_master_split(data_path)
+    y = y_binary if task == "binary" else y_multiclass
+
+    result = {}
+    for name in SPLIT_NAMES:
+        mask = (split_table["split"] == name).to_numpy()
+        result[name] = (X[mask], y[mask])
+    return result
 
 
-# ---------------------------------------------------------------- Pipeline tiền xử lý
-class OutlierDetector(TransformerMixin, BaseEstimator):
-    """Học ngưỡng IQR trên train và đánh dấu outlier. KHÔNG sửa hay xóa dữ liệu."""
+class OutlierDetector(BaseEstimator, TransformerMixin):
+    """Tính ngưỡng IQR giống audit/feature_distributions.py để gắn cờ outlier.
+    Chỉ phát hiện chứ không xóa hay sửa dữ liệu.
+    """
 
-    def fit(self, features, labels=None):
-        features = check_array(features)
-        self.n_features_in_ = features.shape[1]
-        q1, q3 = np.quantile(features, [0.25, 0.75], axis=0)
+    def __init__(self, factor=1.5):
+        self.factor = factor
+
+    def fit(self, X, y=None):
+        X_arr = np.asarray(X, dtype=float)
+        q1 = np.quantile(X_arr, 0.25, axis=0)
+        q3 = np.quantile(X_arr, 0.75, axis=0)
         iqr = q3 - q1
-        self.lower_ = q1 - 1.5 * iqr
-        self.upper_ = q3 + 1.5 * iqr
+        self.lower_ = q1 - self.factor * iqr
+        self.upper_ = q3 + self.factor * iqr
         return self
 
-    def _check_input(self, features):
-        check_is_fitted(self, ["lower_", "upper_"])
-        features = check_array(features)
-        if features.shape[1] != self.n_features_in_:
-            raise ValueError("Số lượng features đã thay đổi")
-        return features
+    def outlier_mask(self, X):
+        X_arr = np.asarray(X, dtype=float)
+        return (X_arr < self.lower_) | (X_arr > self.upper_)
 
-    def outlier_mask(self, features):
-        """Ma trận True/False: ô nào nằm ngoài ngưỡng IQR đã học."""
-        features = self._check_input(features)
-        return (features < self.lower_) | (features > self.upper_)
-
-    def transform(self, features):
-        return self._check_input(features)  # chỉ kiểm tra, giữ nguyên giá trị
-
-
-# Giữ tên cũ để các notebook/test đã viết trước đó vẫn chạy.
-IQRDetector = OutlierDetector
+    def transform(self, X):
+        return np.asarray(X, dtype=float)
 
 
 def make_preprocessor():
-    """Pipeline mới, chưa học gì: điền thiếu bằng median -> đánh dấu outlier -> chuẩn hóa."""
+    """Tạo Pipeline tiền xử lý (chưa fit) gồm: Imputer -> OutlierDetector -> StandardScaler."""
     return Pipeline([
         ("imputer", SimpleImputer(strategy="median", keep_empty_features=True)),
         ("outliers", OutlierDetector()),

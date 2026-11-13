@@ -1,0 +1,16 @@
+check,metric,value
+feature_vector,repeated_groups,517
+feature_vector,rows_in_repeated_groups,1086
+sample_token,unique_tokens,2887
+sample_token,repeated_groups,2878
+sample_token,rows_in_repeated_groups,29289
+sample_token,malware_rows_with_token,29298
+sample_token,malware_rows_without_token,0
+sample_token,benign_rows_without_sample_id,29298
+random_80_20,random_state,42
+random_80_20,train_rows,46876
+random_80_20,validation_rows,11720
+random_80_20_feature_vector,groups_crossing_split,178
+random_80_20_feature_vector,rows_in_crossing_groups,396
+random_80_20_sample_token,groups_crossing_split,2558
+random_80_20_sample_token,rows_in_crossing_groups,26290
