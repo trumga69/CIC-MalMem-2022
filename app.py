@@ -770,12 +770,22 @@ def highlight_results(val):
     else:
         return "background-color: #fef2f2; color: #991b1b; font-weight: bold;"
 
-st.dataframe(
-    display_df.style.applymap(highlight_results, subset=["Kết quả"]) if hasattr(display_df.style, "applymap")
-    else display_df.style.map(highlight_results, subset=["Kết quả"]),
-    use_container_width=True,
-    height=min(320, 45 + num_rows * 38)
-)
+# Với dữ liệu nhỏ (<= 1000 dòng): hiển thị Styler có tô màu
+# Với dữ liệu lớn (> 1000 dòng, ví dụ full raw 58.596 dòng): hiển thị trực tiếp bằng PyArrow tối ưu bộ nhớ
+if num_rows <= 1000:
+    try:
+        if hasattr(display_df.style, "map"):
+            styled_df = display_df.style.map(highlight_results, subset=["Kết quả"])
+        elif hasattr(display_df.style, "applymap"):
+            styled_df = display_df.style.applymap(highlight_results, subset=["Kết quả"])
+        else:
+            styled_df = display_df
+        st.dataframe(styled_df, use_container_width=True, height=min(320, 45 + num_rows * 38))
+    except Exception:
+        st.dataframe(display_df, use_container_width=True, height=min(320, 45 + num_rows * 38))
+else:
+    st.caption(f"⚡ Đang hiển thị bảng dữ liệu lớn ({num_rows:,} dòng) qua cơ chế PyArrow ảo hóa tối ưu bộ nhớ và hiệu năng.")
+    st.dataframe(display_df, use_container_width=True, height=350)
 
 csv_buffer = io.StringIO()
 results_df.to_csv(csv_buffer, index=False)
@@ -792,11 +802,24 @@ st.markdown('<div class="cyber-section-header">3. KHÁM NGHIỆM CHI TIẾT DÒN
 
 col_sel, col_stat = st.columns([1, 2])
 with col_sel:
-    selected_row_idx = st.selectbox(
-        "Chọn dòng dữ liệu cần khám nghiệm chi tiết:",
-        options=list(range(num_rows)),
-        format_func=lambda i: f"Dòng #{i} — Kết quả: {results_df.iloc[i]['Kết quả']} (p_max = {results_df.iloc[i]['p_max']:.3f})"
-    )
+    if num_rows <= 1000:
+        selected_row_idx = st.selectbox(
+            "Chọn dòng dữ liệu cần khám nghiệm chi tiết:",
+            options=list(range(num_rows)),
+            format_func=lambda i: f"Dòng #{i} — Kết quả: {results_df.iloc[i]['Kết quả']} (p_max = {results_df.iloc[i]['p_max']:.3f})"
+        )
+    else:
+        selected_row_idx = int(st.number_input(
+            f"Nhập chỉ số dòng khám nghiệm (0 đến {num_rows - 1}):",
+            min_value=0,
+            max_value=num_rows - 1,
+            value=0,
+            step=1
+        ))
+        # Gợi ý nhanh các dòng Uncertain nếu có
+        unc_rows = results_df.index[results_df["Kết quả"] == rejection_label].tolist()
+        if unc_rows:
+            st.caption(f"⚠️ Phát hiện {len(unc_rows)} ca Uncertain tại các dòng: {unc_rows[:5]}")
 
 row_res = results_df.iloc[selected_row_idx]
 row_features = X_validated.iloc[[selected_row_idx]]

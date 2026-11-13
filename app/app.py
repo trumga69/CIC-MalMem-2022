@@ -48,12 +48,14 @@ def get_project_root() -> Path:
     return curr
 
 ROOT_DIR = get_project_root()
+# Thêm ROOT_DIR và preprocessing_data vào sys.path để unpickler nhận diện module
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 prep_dir = ROOT_DIR / "preprocessing_data"
 if prep_dir.exists() and str(prep_dir) not in sys.path:
     sys.path.insert(0, str(prep_dir))
 
+# Import preprocessing (nếu có) để hỗ trợ unpickle pipeline
 try:
     import preprocessing  # noqa: F401
 except ImportError:
@@ -131,6 +133,7 @@ def validate_csv_input(
     if not text_stripped:
         raise ValueError("Tập tin CSV rỗng: không có dữ liệu hoặc tiêu đề.")
 
+    # Kiểm tra header thô để bắt cột trùng tên
     reader = csv.reader(io.StringIO(text_stripped))
     try:
         raw_header = next(reader)
@@ -165,6 +168,7 @@ def _validate_dataframe(df: pd.DataFrame, expected_features: List[str], auto_dro
     if duplicates:
         raise ValueError(f"Dữ liệu chứa cột trùng lặp: {duplicates}")
 
+    # Tự động gạt bỏ nhãn ground-truth/metadata nếu người dùng tải raw dataset
     KNOWN_LABEL_COLS = {"Class", "Category", "multiclass", "Filename", "row_index", "group_id"}
     if auto_drop_labels:
         label_extras = [c for c in cols if c in KNOWN_LABEL_COLS and c not in expected_features]
@@ -182,8 +186,10 @@ def _validate_dataframe(df: pd.DataFrame, expected_features: List[str], auto_dro
             err_parts.append(f"Dư {len(extra)} cột: {extra}")
         raise ValueError("Không khớp schema 55 features: " + "; ".join(err_parts))
 
+    # Sắp xếp lại đúng thứ tự model
     X = df[expected_features].copy()
 
+    # Kiểm tra chữ rác phi số (giữ lại NaN để imputer xử lý)
     for col in expected_features:
         series = X[col]
         coerced = pd.to_numeric(series, errors="coerce")
@@ -194,6 +200,7 @@ def _validate_dataframe(df: pd.DataFrame, expected_features: List[str], auto_dro
             raise ValueError(f"Cột '{col}' chứa giá trị chữ rác không phải số: {sample_bad}.")
         X[col] = coerced.astype(float)
 
+    # Kiểm tra infinity
     arr = X.to_numpy(dtype=float)
     if np.isinf(arr).any():
         inf_cols = [c for c in expected_features if np.isinf(X[c].dropna().to_numpy()).any()]
@@ -216,6 +223,7 @@ def predict_batch(
     p_max_values = probas[np.arange(len(probas)), argmax_indices]
     candidate_classes = [classes[idx] for idx in argmax_indices]
 
+    # So sánh p_max >= tau TRƯỚC KHI làm tròn
     decisions = [
         candidate_classes[i] if p_max_values[i] >= tau else rejection_label
         for i in range(len(probas))
@@ -255,6 +263,7 @@ def compute_local_top3(
     if classifier is None:
         return {"supported": False, "message": "Không tìm thấy classifier step trong pipeline."}
 
+    # Nếu là Random Forest: chưa hỗ trợ pred_contrib
     if not hasattr(classifier, "booster_"):
         return {
             "supported": False,
@@ -275,9 +284,11 @@ def compute_local_top3(
     target_class = target_class_override if target_class_override is not None else candidate_class
     target_class_idx = classes.index(target_class)
 
+    # Tiền xử lý dữ liệu qua fitted preprocessing
     preprocessor = pipeline.named_steps["preprocessing"]
     X_transformed = preprocessor.transform(row_features)
 
+    # Tính pred_contrib và raw_score từ booster
     booster = classifier.booster_
     raw_scores = booster.predict(X_transformed, raw_score=True)[0]
     contribs = booster.predict(X_transformed, pred_contrib=True)[0]
@@ -287,6 +298,7 @@ def compute_local_top3(
         baseline = float(contribs[55])
         raw_malware = float(raw_scores)
         if target_class == "Benign":
+            # Đảo dấu cả 55 đóng góp và baseline cho Benign
             feat_contribs = -feat_contribs
             baseline = -baseline
             target_raw_score = -raw_malware
@@ -303,11 +315,13 @@ def compute_local_top3(
     else:
         raise ValueError(f"Task không hỗ trợ: '{task}'.")
 
+    # Kiểm chứng parity: sum(contributions) + baseline == raw_score
     sum_contributions = float(np.sum(feat_contribs))
     total_reconstructed = sum_contributions + baseline
     parity_diff = abs(total_reconstructed - target_raw_score)
     is_parity_ok = parity_diff < 1e-4
 
+    # Xếp hạng Top-3 theo |contrib| giảm dần (sau khi bỏ baseline)
     orig_values = row_features.iloc[0].values
     df_contribs = pd.DataFrame({
         "feature": feature_names,
@@ -495,6 +509,7 @@ def get_cached_pipeline(model_id: str):
     return load_pipeline_for_model(model_id, cfg)
 
 
+# Nạp cấu hình toàn cục
 config = load_inference_config()
 model_report = load_model_report()
 
@@ -518,6 +533,7 @@ algo_choice = st.sidebar.radio(
 )
 algo_key = "lightgbm" if "LightGBM" in algo_choice else "random_forest"
 
+# Ánh xạ model ID tương ứng
 if task_key == "binary":
     selected_model_id = "02_binary_lightgbm" if algo_key == "lightgbm" else "01_binary_random_forest"
 else:
@@ -533,6 +549,7 @@ except Exception as e:
     st.sidebar.error(f"Lỗi khi nạp model {selected_model_id}: {e}")
     st.stop()
 
+# Hiển thị thông số model
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 🔒 THÔNG SỐ MODEL ĐANG CHẠY")
 sidebar_info_html = f"""
@@ -570,6 +587,7 @@ if selected_model_id in model_report:
     """
     st.sidebar.html(rep_html)
 
+# Nút nạp nhanh mẫu
 st.sidebar.markdown("---")
 st.sidebar.markdown("### ⚡ TẢI NHANH MẪU KIỂM THỬ")
 
@@ -623,6 +641,7 @@ banner_html = f"""
 st.html(banner_html)
 
 
+# PHẦN 1: NẠP DỮ LIỆU
 st.markdown('<div class="cyber-section-header">1. NẠP DỮ LIỆU ĐẶC TRƯNG BỘ NHỚ (55 MEMORY VECTORS)</div>', unsafe_allow_html=True)
 
 col_up, col_opt = st.columns([3, 1])
@@ -686,6 +705,7 @@ with st.expander("🔍 Xem bảng dữ liệu 55 đặc trưng đã chuẩn hóa
     st.dataframe(X_validated.head(5), use_container_width=True)
 
 
+# PHẦN 2: BẢNG KẾT QUẢ SUY LUẬN
 st.markdown('<div class="cyber-section-header">2. BẢNG KẾT QUẢ SUY LUẬN & THỐNG KÊ ĐỘ PHỦ TELEMETRY</div>', unsafe_allow_html=True)
 
 try:
@@ -750,12 +770,22 @@ def highlight_results(val):
     else:
         return "background-color: #fef2f2; color: #991b1b; font-weight: bold;"
 
-st.dataframe(
-    display_df.style.applymap(highlight_results, subset=["Kết quả"]) if hasattr(display_df.style, "applymap")
-    else display_df.style.map(highlight_results, subset=["Kết quả"]),
-    use_container_width=True,
-    height=min(320, 45 + num_rows * 38)
-)
+# Với dữ liệu nhỏ (<= 1000 dòng): hiển thị Styler có tô màu
+# Với dữ liệu lớn (> 1000 dòng, ví dụ full raw 58.596 dòng): hiển thị trực tiếp bằng PyArrow tối ưu bộ nhớ
+if num_rows <= 1000:
+    try:
+        if hasattr(display_df.style, "map"):
+            styled_df = display_df.style.map(highlight_results, subset=["Kết quả"])
+        elif hasattr(display_df.style, "applymap"):
+            styled_df = display_df.style.applymap(highlight_results, subset=["Kết quả"])
+        else:
+            styled_df = display_df
+        st.dataframe(styled_df, use_container_width=True, height=min(320, 45 + num_rows * 38))
+    except Exception:
+        st.dataframe(display_df, use_container_width=True, height=min(320, 45 + num_rows * 38))
+else:
+    st.caption(f"⚡ Đang hiển thị bảng dữ liệu lớn ({num_rows:,} dòng) qua cơ chế PyArrow ảo hóa tối ưu bộ nhớ và hiệu năng.")
+    st.dataframe(display_df, use_container_width=True, height=350)
 
 csv_buffer = io.StringIO()
 results_df.to_csv(csv_buffer, index=False)
@@ -767,15 +797,29 @@ st.download_button(
 )
 
 
+# PHẦN 3: KHÁM NGHIỆM CHI TIẾT DÒNG
 st.markdown('<div class="cyber-section-header">3. KHÁM NGHIỆM CHI TIẾT DÒNG & GIẢI THÍCH CỤC BỘ (LOCAL TOP-3)</div>', unsafe_allow_html=True)
 
 col_sel, col_stat = st.columns([1, 2])
 with col_sel:
-    selected_row_idx = st.selectbox(
-        "Chọn dòng dữ liệu cần khám nghiệm chi tiết:",
-        options=list(range(num_rows)),
-        format_func=lambda i: f"Dòng #{i} — Kết quả: {results_df.iloc[i]['Kết quả']} (p_max = {results_df.iloc[i]['p_max']:.3f})"
-    )
+    if num_rows <= 1000:
+        selected_row_idx = st.selectbox(
+            "Chọn dòng dữ liệu cần khám nghiệm chi tiết:",
+            options=list(range(num_rows)),
+            format_func=lambda i: f"Dòng #{i} — Kết quả: {results_df.iloc[i]['Kết quả']} (p_max = {results_df.iloc[i]['p_max']:.3f})"
+        )
+    else:
+        selected_row_idx = int(st.number_input(
+            f"Nhập chỉ số dòng khám nghiệm (0 đến {num_rows - 1}):",
+            min_value=0,
+            max_value=num_rows - 1,
+            value=0,
+            step=1
+        ))
+        # Gợi ý nhanh các dòng Uncertain nếu có
+        unc_rows = results_df.index[results_df["Kết quả"] == rejection_label].tolist()
+        if unc_rows:
+            st.caption(f"⚠️ Phát hiện {len(unc_rows)} ca Uncertain tại các dòng: {unc_rows[:5]}")
 
 row_res = results_df.iloc[selected_row_idx]
 row_features = X_validated.iloc[[selected_row_idx]]
@@ -823,6 +867,7 @@ with col_chart_info:
     \n*Ngưỡng quyết định:* $\\tau = {tau_value:.2f}$
     """)
 
+# GIẢI THÍCH CỤC BỘ
 st.markdown("##### 🔬 Phân tích giải thích cục bộ (Local Top-3 Feature Attribution):")
 
 explanation_result = compute_local_top3(
